@@ -1,24 +1,23 @@
-
-"use client"
+"use client";
 
 import Sidebar from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuthContext } from "@/contexts/auth-context";
 
 
 export default function HomePage() {
-  const router = useRouter(); // Hook para navegação
+  const router = useRouter();
+  const { user } = useAuthContext(); // 🎯 Pegando dados do usuário logado
+  console.log(user)
+
   const [history, setHistory] = useState<
     { date: string; mood: string; comment: string; isAnonymous: boolean }[]
   >([]);
-  useEffect(() => {
-    setTimeout(() => {
-      setHistory(mockHistory);
-    }, 1000);
-  }, []);
 
+  // Mock de histórico temporário (pode ser substituído por uma chamada real ao backend futuramente)
   const mockHistory = [
     { date: "31/12/2022", mood: "Feliz", comment: "Hoje foi um dia incrível!", isAnonymous: true },
     { date: "30/12/2022", mood: "Neutro", comment: "Nada demais aconteceu.", isAnonymous: false },
@@ -27,10 +26,18 @@ export default function HomePage() {
     { date: "27/12/2022", mood: "Ansioso", comment: "Muitas coisas acontecendo ao mesmo tempo.", isAnonymous: true },
     { date: "26/12/2022", mood: "Frustrado", comment: "Tive alguns desafios difíceis.", isAnonymous: false },
   ];
+
+  useEffect(() => {
+    // Simulando carregamento do histórico
+    setTimeout(() => {
+      setHistory(mockHistory);
+    }, 1000);
+  }, []);
+
   const handleAddEntry = () => {
     router.push("/register-mood"); // Redireciona para a página de registro de emoção
   };
-  
+
   return (
     <div className="flex h-screen">
       {/* Sidebar Fixa */}
@@ -38,7 +45,8 @@ export default function HomePage() {
 
       {/* Conteúdo Principal */}
       <div className="flex-1 p-8 bg-gray-100">
-        <h1 className="text-3xl font-bold">Olá! Como você está hoje?</h1>
+        {/* 🎨 Saudação personalizada com dados do usuário */}
+        <h1 className="text-3xl font-bold">Olá, {user?.name}! Como você está hoje? 👋</h1>
         <p className="mt-2 text-gray-600">Registre suas emoções e acompanhe seu histórico.</p>
 
         {/* Seção de Registro */}
@@ -59,8 +67,7 @@ export default function HomePage() {
         </div>
 
         {/* Seção de Histórico */}
-          {/* Seção de Histórico */}
-          <div className="mt-8">
+        <div className="mt-8">
           <Card className="p-6 shadow-lg">
             <CardHeader>
               <CardTitle>Histórico de Registros</CardTitle>
@@ -86,7 +93,7 @@ export default function HomePage() {
                           </td>
                           <td className="border border-gray-300 px-4 py-2">{entry.comment}</td>
                           <td className="border border-gray-300 px-4 py-2 font-semibold">
-                            {entry.isAnonymous ? "Anônimo" : "Usuário"}
+                            {entry.isAnonymous ? "Anônimo" : user?.name}
                           </td>
                         </tr>
                       ))
@@ -103,7 +110,6 @@ export default function HomePage() {
             </CardContent>
           </Card>
         </div>
-
       </div>
     </div>
   );
