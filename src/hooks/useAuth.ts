@@ -23,10 +23,11 @@ export default function useAuth() {
     try {
       const response = await fetch(`${API_URL}/user/login`, {
         method: "POST",
+        mode: "cors", // 🌟 Importante
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
       });
-
+  
       if (!response.ok) {
         setError("Email ou senha incorretos. Tente novamente.");
         return false;
@@ -54,12 +55,14 @@ export default function useAuth() {
       email,
       password,
       disabled: false,
+      avatar: '',
       role: role.toLowerCase() === "gerente" ? "manager" : "employee",
     };
 
     try {
       const response = await fetch(`${API_URL}/user/`, {
         method: "POST",
+        mode: "cors", // 🌟 Importante
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData),
       });

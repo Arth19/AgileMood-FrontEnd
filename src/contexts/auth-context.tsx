@@ -1,17 +1,20 @@
+// 🚀 Atualização do AuthContext com refreshUser
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 interface User {
   name: string;
   email: string;
   role: string;
   id: number;
+  team_id?: number;
+  avatar?: string;
 }
 
 interface DecodedToken {
-  sub: string; // email no campo 'sub'
+  sub: string;
   exp: number;
 }
 
@@ -19,6 +22,7 @@ interface AuthContextProps {
   user: User | null;
   loading: boolean;
   logout: () => void;
+  refreshUser: () => Promise<void>; // 🎯 NOVO: Atualiza o estado global do usuário
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -30,12 +34,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-  const fetchUserProfile = async (email: string) => {
+  const fetchUserProfile = async () => {
     const token = localStorage.getItem("token");
     try {
-        console.log(`Getting user ${email}`)
-      const response = await fetch(`${API_URL}/user/${email}`, {
+      const response = await fetch(`${API_URL}/user/logged`, {
         method: "GET",
+        mode: "cors",
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -53,16 +57,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // 🚀 NOVA FUNÇÃO para forçar atualização do usuário no estado global
+  const refreshUser = async () => {
+    setLoading(true);
+    await fetchUserProfile();
+  };
+
   const decodeAndSetUser = () => {
     const token = localStorage.getItem("token");
     if (token) {
       try {
         const decoded: DecodedToken = jwtDecode(token);
-        console.log(decoded)
         if (decoded.exp * 1000 < Date.now()) {
-          logout(); // Token expirado
+          logout();
         } else {
-          fetchUserProfile(decoded.sub); // 🎯 Busca os dados usando o email (sub)
+          fetchUserProfile();
         }
       } catch (error) {
         console.error("Erro ao decodificar o token:", error);
@@ -84,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

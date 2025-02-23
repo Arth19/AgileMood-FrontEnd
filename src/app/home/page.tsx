@@ -1,116 +1,38 @@
 "use client";
 
+import EmployeeHome from "@/components/home/employee-home";
+import ManagerHome from "@/components/home/manager-home";
+import NoTeamAlert from "@/components/home/no-team-alert";
+import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useAuthContext } from "@/contexts/auth-context";
 
-
 export default function HomePage() {
-  const router = useRouter();
-  const { user } = useAuthContext(); // 🎯 Pegando dados do usuário logado
-  console.log(user)
+  const { user, loading } = useAuthContext();
 
-  const [history, setHistory] = useState<
-    { date: string; mood: string; comment: string; isAnonymous: boolean }[]
-  >([]);
-
-  // Mock de histórico temporário (pode ser substituído por uma chamada real ao backend futuramente)
-  const mockHistory = [
-    { date: "31/12/2022", mood: "Feliz", comment: "Hoje foi um dia incrível!", isAnonymous: true },
-    { date: "30/12/2022", mood: "Neutro", comment: "Nada demais aconteceu.", isAnonymous: false },
-    { date: "29/12/2022", mood: "Triste", comment: "Me senti um pouco desmotivado.", isAnonymous: true },
-    { date: "28/12/2022", mood: "Motivado", comment: "Consegui cumprir todas as metas do dia!", isAnonymous: false },
-    { date: "27/12/2022", mood: "Ansioso", comment: "Muitas coisas acontecendo ao mesmo tempo.", isAnonymous: true },
-    { date: "26/12/2022", mood: "Frustrado", comment: "Tive alguns desafios difíceis.", isAnonymous: false },
-  ];
-
-  useEffect(() => {
-    // Simulando carregamento do histórico
-    setTimeout(() => {
-      setHistory(mockHistory);
-    }, 1000);
-  }, []);
-
-  const handleAddEntry = () => {
-    router.push("/register-mood"); // Redireciona para a página de registro de emoção
-  };
+  if (loading) {
+    return <p className="text-center mt-10">Carregando informações do usuário...</p>;
+  }
 
   return (
+    <ProtectedRoute>
     <div className="flex h-screen">
-      {/* Sidebar Fixa */}
       <Sidebar />
-
-      {/* Conteúdo Principal */}
       <div className="flex-1 p-8 bg-gray-100">
-        {/* 🎨 Saudação personalizada com dados do usuário */}
-        <h1 className="text-3xl font-bold">Olá, {user?.name}! Como você está hoje? 👋</h1>
-        <p className="mt-2 text-gray-600">Registre suas emoções e acompanhe seu histórico.</p>
+        <h1 className="text-3xl font-bold">Olá, {user?.name}! 👋</h1>
+        <p className="mt-2 text-gray-600">
+          Cargo: {user?.role === "manager" ? "Gerente" : "Colaborador"} | Email: {user?.email}
+        </p>
 
-        {/* Seção de Registro */}
-        <div className="mt-6">
-          <Card className="p-6 shadow-lg">
-            <CardHeader>
-              <CardTitle>Registrar Emoção</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Registre como você está se sentindo para acompanhar seu bem-estar ao longo do tempo.
-              </p>
-              <Button onClick={handleAddEntry} className="bg-blue-600 hover:bg-blue-700">
-                Registrar Agora
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Seção de Histórico */}
-        <div className="mt-8">
-          <Card className="p-6 shadow-lg">
-            <CardHeader>
-              <CardTitle>Histórico de Registros</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="border border-gray-300 px-4 py-2">Data</th>
-                      <th className="border border-gray-300 px-4 py-2">Emoção</th>
-                      <th className="border border-gray-300 px-4 py-2">Comentário</th>
-                      <th className="border border-gray-300 px-4 py-2">Autor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.length > 0 ? (
-                      history.map((entry, index) => (
-                        <tr key={index} className="text-center">
-                          <td className="border border-gray-300 px-4 py-2">{entry.date}</td>
-                          <td className="border border-gray-300 px-4 py-2">
-                            <span className="bg-gray-200 px-2 py-1 rounded">{entry.mood}</span>
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2">{entry.comment}</td>
-                          <td className="border border-gray-300 px-4 py-2 font-semibold">
-                            {entry.isAnonymous ? "Anônimo" : user?.name}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="text-center py-4 text-gray-500">
-                          Carregando histórico...
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {user?.team_id === null ? (
+          <NoTeamAlert />
+        ) : user?.role === "manager" ? (
+          <ManagerHome />
+        ) : (
+          <EmployeeHome />
+        )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
