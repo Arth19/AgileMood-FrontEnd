@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
 import logo from "@/public/nameLogo.png";
-import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/auth-context";
 
 interface NavItemProps {
   href: string;
@@ -23,12 +23,13 @@ const NavItem: React.FC<NavItemProps> = ({ href, Icon, label }) => (
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
+   const { logout } = useAuthContext();
+ 
 
   // Função de logout (simulação)
   const handleLogout = () => {
     console.log("Usuário deslogado"); // Aqui pode ser integrada a lógica real de logout (ex: remover token)
-    router.push("/login"); // Redireciona para a página de login após logout
+    logout()// Redireciona para a página de login após logout
   };
 
   return (
