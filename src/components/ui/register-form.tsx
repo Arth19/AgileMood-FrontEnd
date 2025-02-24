@@ -17,8 +17,8 @@ export default function RegisterForm({ switchToLogin }: { switchToLogin: () => v
     e.preventDefault();
     const success = await register(userName, email, password, role);
     if (success) {
-      switchToLogin();
-      window.location.reload();
+      // O login automático já foi feito no hook useAuth
+      // Não é necessário fazer nada aqui, pois o usuário será redirecionado automaticamente
     }
   };
 

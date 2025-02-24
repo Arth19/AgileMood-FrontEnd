@@ -30,7 +30,7 @@ export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
   REGISTER: '/register',
-  DASHBOARD: '/dashboard',
+  DASHBOARD: '/home',
   TEAM: '/team',
   PROFILE: '/profile',
 } as const; 
