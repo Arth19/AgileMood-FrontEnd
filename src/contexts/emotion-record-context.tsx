@@ -84,22 +84,28 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchEmotions = async () => {
-    try {
-      const response = await fetch(`${API_URL}/emotion/`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setEmotions(data.emotions.length ? data.emotions : mockEmotions);
-        if (data.emotions.length === 0) toast.info("⚡ Exibindo emoções de exemplo.");
-      } else {
+    if (user) {
+      try {
+        const response = await fetch(`${API_URL}/teams/${user.team_id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setEmotions(data.emotions.length ? data.emotions : mockEmotions);
+          console.log(data.emotions)
+          if (data.emotions.length === 0) toast.info("⚡ Exibindo emoções de exemplo.");
+        } else {
+          setEmotions(mockEmotions);
+          toast.error("⚠️ Erro ao carregar emoções. Exibindo mock.");
+        }
+      } catch (error) {
+        console.error("Erro ao buscar emoções:", error);
         setEmotions(mockEmotions);
-        toast.error("⚠️ Erro ao carregar emoções. Exibindo mock.");
+        toast.error("⚠️ Erro inesperado. Exibindo mock.");
       }
-    } catch (error) {
-      console.error("Erro ao buscar emoções:", error);
-      setEmotions(mockEmotions);
-      toast.error("⚠️ Erro inesperado. Exibindo mock.");
+    }
+    else {
+      toast.error("⚠️ Erro ao carregar informações do user.");
     }
   };
 
