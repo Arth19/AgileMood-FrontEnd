@@ -36,13 +36,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserProfile = async () => {
     const token = localStorage.getItem("token");
+    if (!token) {
+      logout();
+      return;
+    }
+  
     try {
       const response = await fetch(`${API_URL}/user/logged`, {
         method: "GET",
         mode: "cors",
         headers: { Authorization: `Bearer ${token}` },
       });
-
+  
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
@@ -59,6 +64,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // 🚀 NOVA FUNÇÃO para forçar atualização do usuário no estado global
   const refreshUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      logout();
+      return;
+    }
+  
     setLoading(true);
     await fetchUserProfile();
   };
