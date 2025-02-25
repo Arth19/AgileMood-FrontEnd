@@ -19,7 +19,7 @@ console.log('USER IN HOME: ', user)
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 p-8 bg-gray-100">
-        <h1 className="text-3xl font-bold">Olá, {user?.name}! ��</h1>
+        <h1 className="text-3xl font-bold">Olá, {user?.name}!</h1>
         <p className="mt-2 text-gray-600 mb-10">
           Cargo: {user?.role === "manager" ? "Gerente" : "Colaborador"} | Email: {user?.email}
         </p>
