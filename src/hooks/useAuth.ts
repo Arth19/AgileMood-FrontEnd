@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/auth-context";
 
 export default function useAuth() {
   const router = useRouter();
+  const { refreshUser } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -35,6 +37,9 @@ export default function useAuth() {
 
       const data = await response.json();
       localStorage.setItem("token", data.access_token);
+      
+      // Atualiza o contexto do usuário antes de redirecionar
+      await refreshUser();
       router.push("/home");
       return true;
     } catch (err: any) {
@@ -62,7 +67,7 @@ export default function useAuth() {
     try {
       const response = await fetch(`${API_URL}/user/`, {
         method: "POST",
-        mode: "cors", // 🌟 Importante
+        mode: "cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData),
       });
@@ -72,7 +77,14 @@ export default function useAuth() {
         return false;
       }
 
-      setSuccessMessage("Usuário cadastrado com sucesso!");
+      // Após o registro bem-sucedido, fazer login automaticamente
+      const loginSuccess = await login(email, password);
+      if (!loginSuccess) {
+        setError("Registro realizado, mas houve um erro ao fazer login automático.");
+        return false;
+      }
+
+      setSuccessMessage("Usuário cadastrado e logado com sucesso!");
       return true;
     } catch (err: any) {
       setError(err.message || "Erro inesperado no cadastro.");

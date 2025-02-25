@@ -15,7 +15,11 @@ export default function RegisterForm({ switchToLogin }: { switchToLogin: () => v
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await register(userName, email, password, role);
+    const success = await register(userName, email, password, role);
+    if (success) {
+      // O login automático já foi feito no hook useAuth
+      // Não é necessário fazer nada aqui, pois o usuário será redirecionado automaticamente
+    }
   };
 
   return (

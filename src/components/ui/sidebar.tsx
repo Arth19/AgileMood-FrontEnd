@@ -23,13 +23,10 @@ const NavItem: React.FC<NavItemProps> = ({ href, Icon, label }) => (
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
-   const { logout } = useAuthContext();
- 
+  const { logout } = useAuthContext();
 
-  // Função de logout (simulação)
   const handleLogout = () => {
-    console.log("Usuário deslogado"); // Aqui pode ser integrada a lógica real de logout (ex: remover token)
-    logout()// Redireciona para a página de login após logout
+    logout();
   };
 
   return (

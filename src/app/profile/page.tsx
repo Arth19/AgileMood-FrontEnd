@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { useAuthContext } from "@/contexts/auth-context";
 import ProtectedRoute from "@/components/ui/protected-route";
+import { motion } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Camera, RefreshCw, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const getInitialsAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=128`;
@@ -19,21 +25,17 @@ const generateAvatars = () => {
 };
 
 export default function ProfilePage() {
-  const { user,refreshUser } = useAuthContext();
+  const { user, refreshUser } = useAuthContext();
   const [avatar, setAvatar] = useState<string>(user?.avatar || "");
-  const [originalAvatar, setOriginalAvatar] = useState<string>(user?.avatar || ""); // Para comparar alterações
+  const [originalAvatar, setOriginalAvatar] = useState<string>(user?.avatar || "");
   const [teamName, setTeamName] = useState<string>("Carregando...");
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
   const [avatarOptions, setAvatarOptions] = useState(generateAvatars());
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false); // 🎯 Estado para exibir o Dialog
-
-console.log('USER IN PROFILE: ', user)
-console.log('ORIGINAL AVATAR: ', originalAvatar)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-  // 🔗 Busca o nome do time com o team_id
   useEffect(() => {
     const fetchTeamName = async () => {
       if (user?.team_id) {
@@ -60,7 +62,6 @@ console.log('ORIGINAL AVATAR: ', originalAvatar)
     fetchTeamName();
   }, [user?.team_id, API_URL]);
 
-  // ✅ Atualização do avatar via PUT
   const handleSaveAvatar = async () => {
     setIsSaving(true);
     try {
@@ -72,21 +73,22 @@ console.log('ORIGINAL AVATAR: ', originalAvatar)
         },
         body: JSON.stringify({ avatar }),
       });
-  
+
       if (response.ok) {
-        await refreshUser(); // 🎯 Atualiza o estado global do usuário
+        await refreshUser();
         setOriginalAvatar(avatar);
-        setShowSuccessDialog(true);
+        toast.success("Avatar atualizado com sucesso!");
       } else {
-        alert("Erro ao atualizar o avatar. Tente novamente.");
+        toast.error("Erro ao atualizar o avatar. Tente novamente.");
       }
     } catch (error) {
       console.error("Erro ao salvar o avatar:", error);
-      alert("Erro ao salvar o avatar.");
+      toast.error("Erro ao salvar o avatar.");
     } finally {
       setIsSaving(false);
     }
   };
+
   const handleSelectAvatar = (avatar: string) => {
     setAvatar(avatar);
     setIsEditingAvatar(false);
@@ -103,113 +105,179 @@ console.log('ORIGINAL AVATAR: ', originalAvatar)
 
   return (
     <ProtectedRoute>
-    <div className="flex h-screen">
-      {/* Sidebar fixa */}
-      <Sidebar />
-
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 p-6">
-        <div className="w-full max-w-2xl p-6 shadow-lg bg-white rounded-lg">
-          <h2 className="text-2xl font-bold">Configurações Pessoais</h2>
-
-          {/* Avatar */}
-          <div className="flex items-center space-x-6 mt-6">
-            <Image
-              src={avatar || getInitialsAvatar(user?.name || "")}
-              alt="Avatar"
-              width={80}
-              height={80}
-              className="rounded-full border"
-              unoptimized
-            />
-            <Button onClick={() => setIsEditingAvatar(true)} className="bg-blue-600 hover:bg-blue-700">
-              Editar Avatar
-            </Button>
-          </div>
-
-          {/* Dados do Usuário */}
-          <div className="mt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-600">Nome</label>
-                <input value={user?.name || ""} className="border p-2 w-full bg-gray-200 rounded" readOnly />
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-8">
+                <h1 className="text-3xl font-bold text-gray-900">Configurações do Perfil</h1>
+                {avatar !== originalAvatar && (
+                  <Button
+                    onClick={handleSaveAvatar}
+                    disabled={isSaving}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      "Salvar Alterações"
+                    )}
+                  </Button>
+                )}
               </div>
-              <div>
-                <label className="block text-gray-600">Time</label>
-                <input value={teamName} className="border p-2 w-full bg-gray-200 rounded" readOnly />
-              </div>
-            </div>
-            <div>
-              <label className="block text-gray-600">E-mail</label>
-              <input value={user?.email} className="border p-2 w-full bg-gray-200 rounded" readOnly />
-            </div>
-            <div>
-              <label className="block text-gray-600">Cargo</label>
-              <input
-                value={user?.role === "manager" ? "Gerente" : "Colaborador"}
-                className="border p-2 w-full bg-gray-200 rounded"
-                readOnly
-              />
-            </div>
-          </div>
 
-          <div className="mt-6 flex justify-end">
-            <Button
-              onClick={handleSaveAvatar}
-              className={`bg-green-600 hover:bg-green-700 ${avatar === originalAvatar ? "opacity-50 cursor-not-allowed" : ""}`}
-              disabled={avatar === originalAvatar || isSaving}
-            >
-              {isSaving ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </div>
-          {/* 🎉 Dialog de sucesso ao salvar */}
-          <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>✅ Avatar Atualizado com Sucesso!</DialogTitle>
-            </DialogHeader>
-            <p className="text-gray-600 text-center">
-              Seu avatar foi salvo com sucesso. Ele já está visível no seu perfil.
-            </p>
-            <DialogFooter>
-              <Button
-                onClick={() => setShowSuccessDialog(false)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                OK
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <Tabs defaultValue="profile" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="profile">Perfil</TabsTrigger>
+                  <TabsTrigger value="avatar">Avatar</TabsTrigger>
+                </TabsList>
 
-        {/* Modal para Seleção de Avatar */}
-        {isEditingAvatar && (
+                <TabsContent value="profile" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Informações Pessoais</CardTitle>
+                      <CardDescription>
+                        Suas informações básicas de perfil.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Nome</label>
+                          <div className="mt-1 p-3 bg-gray-100 rounded-md">
+                            {user?.name}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Email</label>
+                          <div className="mt-1 p-3 bg-gray-100 rounded-md">
+                            {user?.email}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Time</label>
+                          <div className="mt-1 p-3 bg-gray-100 rounded-md">
+                            {teamName}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Cargo</label>
+                          <div className="mt-1 flex items-center space-x-2">
+                            <div className="p-3 bg-gray-100 rounded-md flex-1">
+                              {user?.role === "manager" ? "Gerente" : "Colaborador"}
+                            </div>
+                            <Badge variant="outline" className={user?.role === "manager" ? "bg-blue-100" : "bg-green-100"}>
+                              {user?.role === "manager" ? "👑 Manager" : "👤 Member"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="avatar" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Personalização do Avatar</CardTitle>
+                      <CardDescription>
+                        Escolha ou gere um novo avatar para seu perfil.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col items-center space-y-6">
+                        <div className="relative group">
+                          <Image
+                            src={avatar || getInitialsAvatar(user?.name || "")}
+                            alt="Avatar"
+                            width={128}
+                            height={128}
+                            className="rounded-full border-4 border-white shadow-lg transition-transform group-hover:scale-105"
+                            unoptimized
+                          />
+                          <button
+                            onClick={() => setIsEditingAvatar(true)}
+                            className="absolute bottom-0 right-0 p-2 bg-blue-600 rounded-full text-white shadow-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Camera size={20} />
+                          </button>
+                        </div>
+
+                        <div className="flex space-x-4">
+                          <Button
+                            variant="outline"
+                            onClick={fetchNewAvatars}
+                            className="flex items-center space-x-2"
+                          >
+                            <RefreshCw size={16} />
+                            <span>Gerar Novos</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleRemoveAvatar}
+                            className="flex items-center space-x-2 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 size={16} />
+                            <span>Remover</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </motion.div>
+
           <Dialog open={isEditingAvatar} onOpenChange={setIsEditingAvatar}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Escolha um avatar</DialogTitle>
+                <DialogTitle>Escolha seu novo avatar</DialogTitle>
               </DialogHeader>
-              <div className="grid grid-cols-3 gap-4">
-                {avatarOptions.map((avatar, index) => (
-                  <button key={index} onClick={() => handleSelectAvatar(avatar)}>
-                    <Image src={avatar} alt={`Avatar ${index}`} width={80} height={80} className="rounded-full border" unoptimized />
-                  </button>
+              <div className="grid grid-cols-3 gap-4 py-4">
+                {avatarOptions.map((avatarOption, index) => (
+                  <motion.button
+                    key={index}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleSelectAvatar(avatarOption)}
+                    className={`relative rounded-lg p-2 transition-all ${
+                      avatar === avatarOption
+                        ? "ring-2 ring-blue-600 bg-blue-50"
+                        : "hover:bg-gray-100"
+                    }`}
+                  >
+                    <Image
+                      src={avatarOption}
+                      alt={`Avatar option ${index + 1}`}
+                      width={80}
+                      height={80}
+                      className="rounded-lg"
+                      unoptimized
+                    />
+                  </motion.button>
                 ))}
               </div>
-              <div className="flex justify-center mt-4 space-x-4">
-                <Button onClick={fetchNewAvatars} className="bg-blue-500 hover:bg-blue-700">
-                  Carregar Novos Avatares 🔄
+              <DialogFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => setIsEditingAvatar(false)}>
+                  Cancelar
                 </Button>
-                <Button onClick={handleRemoveAvatar} className="bg-red-600 hover:bg-red-700">
-                  Não usar avatar
+                <Button onClick={fetchNewAvatars} className="bg-blue-600 hover:bg-blue-700">
+                  Gerar Novos Avatares
                 </Button>
-              </div>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+        </div>
       </div>
-    </div>
     </ProtectedRoute>
   );
 }

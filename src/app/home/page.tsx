@@ -13,16 +13,17 @@ export default function HomePage() {
   if (loading) {
     return <p className="text-center mt-10">Carregando informações do usuário...</p>;
   }
-
+console.log('USER IN HOME: ', user)
   return (
     <ProtectedRoute>
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 p-8 bg-gray-100">
-        <h1 className="text-3xl font-bold">Olá, {user?.name}! 👋</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-3xl font-bold">Olá, {user?.name}!</h1>
+        <p className="mt-2 text-gray-600 mb-10">
           Cargo: {user?.role === "manager" ? "Gerente" : "Colaborador"} | Email: {user?.email}
         </p>
+        
 
         {user?.team_id === null ? (
           <NoTeamAlert />
