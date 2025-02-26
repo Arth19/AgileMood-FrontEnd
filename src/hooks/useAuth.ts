@@ -65,15 +65,28 @@ export default function useAuth() {
     };
 
     try {
+      console.log('Dados sendo enviados:', userData);
+      console.log('URL da API:', API_URL);
+      
       const response = await fetch(`${API_URL}/user/`, {
         method: "POST",
         mode: "cors",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify(userData),
       });
 
       if (!response.ok) {
-        setError("Erro ao cadastrar. Tente novamente.");
+        const errorData = await response.json().catch(() => null);
+        console.error('Resposta da API:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        
+        setError(errorData?.detail || "Erro ao cadastrar. Verifique os dados e tente novamente.");
         return false;
       }
 
@@ -87,6 +100,7 @@ export default function useAuth() {
       setSuccessMessage("Usuário cadastrado e logado com sucesso!");
       return true;
     } catch (err: any) {
+      console.error('Erro durante o registro:', err);
       setError(err.message || "Erro inesperado no cadastro.");
       return false;
     } finally {

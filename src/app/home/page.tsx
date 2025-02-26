@@ -25,10 +25,10 @@ console.log('USER IN HOME: ', user)
         </p>
         
 
-        {user?.team_id === null ? (
-          <NoTeamAlert />
-        ) : user?.role === "manager" ? (
+        {user?.role === "manager" ? (
           <ManagerHome />
+        ) : user?.team_id === null ? (
+          <NoTeamAlert />
         ) : (
           <EmployeeHome />
         )}

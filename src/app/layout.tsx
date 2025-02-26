@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { EmotionRecordProvider } from "@/contexts/emotion-record-context";
+import { TeamProvider } from "@/contexts/team-context";
 // 🚀 Importando o AuthProvider
 
 const geistSans = Geist({
@@ -30,7 +31,9 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* 🌟 Envolvendo a aplicação com AuthProvider */}
         <AuthProvider>  <EmotionRecordProvider>
-            {children}
+            <TeamProvider>
+              {children}
+            </TeamProvider>
           </EmotionRecordProvider></AuthProvider>
       </body>
     </html>
