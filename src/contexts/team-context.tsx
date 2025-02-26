@@ -7,7 +7,7 @@ import { teamService } from "@/lib/services/team-service";
 interface TeamContextData {
   teams: Team[];
   isLoading: boolean;
-  createTeam: (data: CreateTeamDTO) => Promise<void>;
+  createTeam: (data: CreateTeamDTO) => Promise<Team>;
   updateTeam: (data: UpdateTeamDTO) => Promise<void>;
   deleteTeam: (id: number) => Promise<void>;
   loadTeams: () => Promise<void>;
@@ -35,8 +35,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const createTeam = useCallback(async (data: CreateTeamDTO) => {
     try {
       setIsLoading(true);
-      await teamService.createTeam(data);
+      const newTeam = await teamService.createTeam(data);
       await loadTeams();
+      return newTeam;
     } catch (error) {
       console.error('Erro ao criar time:', error);
       throw error;

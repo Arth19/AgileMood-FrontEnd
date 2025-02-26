@@ -25,24 +25,39 @@ export default function useAuth() {
     try {
       const response = await fetch(`${API_URL}/user/login`, {
         method: "POST",
-        mode: "cors", // 🌟 Importante
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        mode: "cors",
+        credentials: "include",
+        headers: { 
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept": "application/json"
+        },
         body: formData.toString(),
       });
   
       if (!response.ok) {
-        setError("Email ou senha incorretos. Tente novamente.");
+        const errorData = await response.json().catch(() => null);
+        setError(errorData?.detail || "Email ou senha incorretos. Tente novamente.");
         return false;
       }
 
       const data = await response.json();
-      localStorage.setItem("token", data.access_token);
       
-      // Atualiza o contexto do usuário antes de redirecionar
-      await refreshUser();
-      router.push("/home");
-      return true;
+      // Armazena o token no localStorage e nos cookies
+      localStorage.setItem("token", data.access_token);
+      document.cookie = `agile-mood-token=${data.access_token}; path=/; secure; samesite=strict`;
+      
+      try {
+        // Atualiza o contexto do usuário antes de redirecionar
+        await refreshUser();
+        router.push("/home");
+        return true;
+      } catch (refreshError) {
+        console.error("Erro ao atualizar usuário:", refreshError);
+        setError("Erro ao carregar informações do usuário.");
+        return false;
+      }
     } catch (err: any) {
+      console.error("Erro no login:", err);
       setError(err.message || "Erro inesperado no login.");
       return false;
     } finally {

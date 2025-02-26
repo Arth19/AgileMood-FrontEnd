@@ -8,10 +8,13 @@ import { Team } from "@/lib/types";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTeam } from "@/contexts/team-context";
 import { useAuthContext } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+
 
 export function TeamManagement() {
   const { teams, isLoading, createTeam, updateTeam, deleteTeam, loadTeams } = useTeam();
   const { user } = useAuthContext();
+  const router = useRouter();
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [formData, setFormData] = useState({ name: "" });
 
@@ -32,10 +35,14 @@ export function TeamManagement() {
         await updateTeam({ 
           ...formData, 
           id: editingTeam.id,
-          manager_id: user.email
+          manager_id: "2"
         });
       } else {
-        await createTeam({ ...formData, manager_id: user.email });
+        const result = await createTeam({ ...formData, manager_id: "2" });
+        if (!result) {
+          throw new Error("Falha ao criar o time");
+        }
+        router.push(`/teams/${result.id}`);
       }
       setFormData({ name: "" });
       setEditingTeam(null);
@@ -57,6 +64,10 @@ export function TeamManagement() {
   function handleEdit(team: Team) {
     setEditingTeam(team);
     setFormData({ name: team.name });
+  }
+
+  function handleTeamClick(teamId: number) {
+    router.push(`/teams/${teamId}`);
   }
 
   if (user?.role !== "manager") {
@@ -91,7 +102,11 @@ export function TeamManagement() {
 
       <div className="grid gap-4">
         {teams.map((team) => (
-          <Card key={team.id} className="p-4">
+          <Card 
+            key={team.id} 
+            className="p-4 cursor-pointer hover:shadow-md transition-shadow duration-200"
+            onClick={() => handleTeamClick(team.id)}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-semibold">{team.name}</h3>
@@ -99,7 +114,7 @@ export function TeamManagement() {
                   Criado em: {new Date(team.created_at).toLocaleDateString('pt-BR')}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                 <Button
                   variant="outline"
                   size="icon"

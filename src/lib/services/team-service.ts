@@ -1,4 +1,4 @@
-import { CreateTeamDTO, Team, TeamsResponse, UpdateTeamDTO } from "../types";
+import { CreateTeamDTO, Team, TeamsResponse, UpdateTeamDTO, TeamResponse } from "../types";
 import { API_ROUTES } from "../config";
 
 class TeamService {
@@ -30,10 +30,7 @@ class TeamService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          name: data.name,
-          manager_id: data.manager_id
-        }),
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
@@ -41,7 +38,8 @@ class TeamService {
         throw new Error(errorData?.message || 'Falha ao criar time');
       }
 
-      return response.json();
+      const responseData = await response.json();
+      return responseData.team;
     } catch (error) {
       console.error('Erro ao criar time:', error);
       throw error;
@@ -59,7 +57,7 @@ class TeamService {
         },
         body: JSON.stringify({
           name: data.name,
-          manager_id: data.manager_id
+          manager_id: Number(data.manager_id)
         }),
       });
 
@@ -91,6 +89,27 @@ class TeamService {
       }
     } catch (error) {
       console.error('Erro ao excluir time:', error);
+      throw error;
+    }
+  }
+
+  async getTeamById(id: number): Promise<TeamResponse> {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_ROUTES.teams}/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Falha ao buscar time');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar time:', error);
       throw error;
     }
   }
