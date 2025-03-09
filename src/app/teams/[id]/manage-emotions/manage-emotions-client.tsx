@@ -9,6 +9,8 @@ import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
 import { useEmotionRecordContext } from "@/contexts/emotion-record-context";
 import { useAuthContext } from "@/contexts/auth-context";
+import AddCustomEmotion from "./components/add-custom-emotion";
+import SelectedEmotionsSummary from "./components/selected-emotions-summary";
 
 interface ManageEmotionsClientProps {
   teamId: number;
@@ -31,7 +33,16 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
         
         // Inicializa as emoções selecionadas com as emoções atuais do time
         if (teamEmotions.length > 0) {
-          setSelectedEmotions(teamEmotions.map(emotion => emotion.id));
+          console.log("Emoções do time carregadas:", teamEmotions);
+          const teamEmotionIds = teamEmotions.map(emotion => {
+            console.log(`Emoção do time: ID=${emotion.id}, Nome=${emotion.name}, Tipo ID=${typeof emotion.id}`);
+            return emotion.id;
+          });
+          console.log("IDs das emoções do time:", teamEmotionIds);
+          setSelectedEmotions(teamEmotionIds);
+        } else {
+          console.log("Nenhuma emoção do time encontrada");
+          setSelectedEmotions([]);
         }
       } catch (error) {
         console.error("Erro ao carregar emoções:", error);
@@ -51,34 +62,91 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
   }, [teamId, user]);
 
   const handleToggleEmotion = (emotionId: number) => {
+    console.log(`Toggle emoção ID: ${emotionId}, Tipo: ${typeof emotionId}`);
+    
+    // Verificar se o ID é válido
+    if (typeof emotionId !== 'number' || isNaN(emotionId) || emotionId <= 0) {
+      console.error(`ID de emoção inválido: ${emotionId}`);
+      toast.error("Erro ao selecionar emoção: ID inválido");
+      return;
+    }
+    
     setSelectedEmotions(prev => {
+      // Verificar se o array anterior é válido
+      if (!Array.isArray(prev)) {
+        console.error("selectedEmotions não é um array:", prev);
+        return [emotionId];
+      }
+      
       // Se já está selecionado, remove
       if (prev.includes(emotionId)) {
+        console.log(`Removendo emoção ID: ${emotionId}`);
         return prev.filter(id => id !== emotionId);
       }
+      
       // Se não está selecionado e já tem 6 emoções, não adiciona
       if (prev.length >= 6) {
+        console.log("Limite de 6 emoções atingido");
         toast.error("Você só pode selecionar 6 emoções para o time.");
         return prev;
       }
+      
       // Adiciona a emoção
+      console.log(`Adicionando emoção ID: ${emotionId}`);
       return [...prev, emotionId];
     });
   };
 
   const handleSaveTeamEmotions = async () => {
+    console.log("Emoções selecionadas:", selectedEmotions);
+    console.log("Quantidade de emoções selecionadas:", selectedEmotions.length);
+    
+    // Verificar se o array de emoções selecionadas é válido
+    if (!Array.isArray(selectedEmotions)) {
+      toast.error("Erro interno: formato inválido de emoções selecionadas.");
+      return;
+    }
+    
+    // Verificar se há exatamente 6 emoções selecionadas
     if (selectedEmotions.length !== 6) {
       toast.error("Você precisa selecionar exatamente 6 emoções para o time.");
+      return;
+    }
+    
+    // Verificar se todas as emoções selecionadas existem no array allEmotions
+    const selectedEmotionsDetails = selectedEmotions.map(id => 
+      allEmotions.find(emotion => emotion.id === id)
+    ).filter(Boolean);
+    
+    console.log("Detalhes das emoções selecionadas:", selectedEmotionsDetails);
+    
+    if (selectedEmotionsDetails.length !== 6) {
+      toast.error("Algumas emoções selecionadas não foram encontradas. Tente novamente.");
       return;
     }
 
     setSaving(true);
     try {
-      const success = await updateTeamEmotions(selectedEmotions);
+      // Exibir mensagem informativa
+      toast.info("Enviando emoções para o servidor e atualizando o time...");
+      
+      // Criar uma cópia do array para evitar problemas de referência
+      const emotionIdsToSend = [...selectedEmotions];
+      console.log("Enviando IDs de emoções:", emotionIdsToSend);
+      
+      const success = await updateTeamEmotions(emotionIdsToSend);
+      console.log("Resultado do updateTeamEmotions:", success);
+      
       if (success) {
-        toast.success("Emoções do time atualizadas com sucesso!");
-        router.push(`/teams/${teamId}`);
+        // A mensagem de sucesso já é exibida na função updateTeamEmotions
+        // Aguardar um pouco antes de redirecionar para que o usuário veja as mensagens
+        setTimeout(() => {
+          router.push(`/teams/${teamId}`);
+        }, 2000);
       }
+    } catch (error) {
+      console.error("Erro ao salvar emoções:", error);
+      toast.error("Ocorreu um erro inesperado ao salvar as emoções do time.");
     } finally {
       setSaving(false);
     }
@@ -130,42 +198,58 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
                 </div>
               </div>
 
+              {Array.isArray(selectedEmotions) && selectedEmotions.length > 0 && (
+                <SelectedEmotionsSummary 
+                  selectedEmotions={selectedEmotions} 
+                  allEmotions={allEmotions} 
+                />
+              )}
+
               <div className="mb-4">
-                <h2 className="text-xl font-semibold mb-4">Emoções Disponíveis</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">Emoções Disponíveis</h2>
+                  <AddCustomEmotion onEmotionAdded={() => fetchAllEmotions()} />
+                </div>
                 <p className="text-sm text-gray-600 mb-4">
                   {selectedEmotions.length}/6 emoções selecionadas
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {allEmotions.map(emotion => (
-                    <div 
-                      key={emotion.id}
-                      onClick={() => handleToggleEmotion(emotion.id)}
-                      className={`
-                        flex items-center p-4 rounded-lg cursor-pointer border transition-all
-                        ${selectedEmotions.includes(emotion.id) 
-                          ? `border-2 border-blue-500 bg-blue-50` 
-                          : `border-gray-200 hover:border-gray-300`}
-                      `}
-                      style={{
-                        borderColor: selectedEmotions.includes(emotion.id) ? emotion.color : undefined,
-                        backgroundColor: selectedEmotions.includes(emotion.id) ? `${emotion.color}15` : undefined
-                      }}
-                    >
-                      <div className="flex-1 flex items-center gap-3">
-                        <span className="text-3xl">{emotion.emoji}</span>
-                        <div>
-                          <p className="font-medium">{emotion.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {emotion.is_negative ? "Emoção Negativa" : "Emoção Positiva"}
-                          </p>
+                  {allEmotions.map(emotion => {
+                    // Verificar se o ID da emoção é válido
+                    const emotionId = emotion.id;
+                    const isSelected = Array.isArray(selectedEmotions) && selectedEmotions.includes(emotionId);
+                    
+                    return (
+                      <div 
+                        key={emotionId}
+                        onClick={() => handleToggleEmotion(emotionId)}
+                        className={`
+                          flex items-center p-4 rounded-lg cursor-pointer border transition-all
+                          ${isSelected 
+                            ? `border-2 border-blue-500 bg-blue-50` 
+                            : `border-gray-200 hover:border-gray-300`}
+                        `}
+                        style={{
+                          borderColor: isSelected ? emotion.color : undefined,
+                          backgroundColor: isSelected ? `${emotion.color}15` : undefined
+                        }}
+                      >
+                        <div className="flex-1 flex items-center gap-3">
+                          <span className="text-3xl">{emotion.emoji}</span>
+                          <div>
+                            <p className="font-medium">{emotion.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {emotion.is_negative ? "Emoção Negativa" : "Emoção Positiva"}
+                            </p>
+                          </div>
                         </div>
+                        {isSelected && (
+                          <Check className="h-5 w-5" style={{ color: emotion.color }} />
+                        )}
                       </div>
-                      {selectedEmotions.includes(emotion.id) && (
-                        <Check className="h-5 w-5" style={{ color: emotion.color }} />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -174,12 +258,14 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
                   variant="outline" 
                   className="mr-4"
                   onClick={() => router.push(`/teams/${teamId}`)}
+                  disabled={saving}
                 >
                   Cancelar
                 </Button>
                 <Button 
                   onClick={handleSaveTeamEmotions}
-                  disabled={saving || selectedEmotions.length !== 6}
+                  disabled={saving || !Array.isArray(selectedEmotions) || selectedEmotions.length !== 6}
+                  className="relative"
                 >
                   {saving ? (
                     <>
@@ -187,7 +273,14 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
                       Salvando...
                     </>
                   ) : (
-                    'Salvar Emoções do Time'
+                    <>
+                      Salvar Emoções do Time
+                      {Array.isArray(selectedEmotions) && (
+                        <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                          {selectedEmotions.length}/6
+                        </span>
+                      )}
+                    </>
                   )}
                 </Button>
               </div>

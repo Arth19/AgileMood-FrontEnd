@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/contexts/auth-context";
+import { getAllEmotionsWithIds } from "@/mocks/emotions";
 
 interface Emotion {
   id: number;
@@ -41,17 +42,11 @@ interface EmotionRecordContextProps {
   ) => Promise<void>;
   updateTeamEmotions: (selectedEmotionIds: number[]) => Promise<boolean>;
   getEmotionDetails: (emotionId: number) => Emotion | undefined;
+  createEmotion: (emotion: Omit<Emotion, 'id' | 'team_id'>) => Promise<{ success: boolean; data?: Emotion; error?: string }>;
 }
 
 // 🌟 **Mock de Emoções**
-const mockEmotions: Emotion[] = [
-  { id: 1, name: "Feliz", emoji: "😃", color: "#FFD700", team_id: 1, is_negative: false },
-  { id: 2, name: "Neutro", emoji: "😐", color: "#A9A9A9", team_id: 1, is_negative: false },
-  { id: 3, name: "Triste", emoji: "😢", color: "#87CEEB", team_id: 1, is_negative: true },
-  { id: 4, name: "Frustrado", emoji: "😠", color: "#FF6347", team_id: 1, is_negative: true },
-  { id: 5, name: "Ansioso", emoji: "😰", color: "#FFA500", team_id: 1, is_negative: true },
-  { id: 6, name: "Motivado", emoji: "🚀", color: "#32CD32", team_id: 1, is_negative: false },
-];
+const mockEmotions: Emotion[] = getAllEmotionsWithIds();
 
 // 🌟 **Mock de Registros de Emoção**
 const mockEmotionRecords: EmotionRecord[] = [
@@ -87,36 +82,106 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
   const { user } = useAuthContext();
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-  const fetchEmotions = async () => {
-    if (user) {
-      try {
-        const response = await fetch(`${API_URL}/teams/${user.team_id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setEmotions(data.emotions.length ? data.emotions : mockEmotions);
-          console.log(data.emotions)
-          if (data.emotions.length === 0) toast.info("⚡ Exibindo emoções de exemplo.");
-        } else {
-          setEmotions(mockEmotions);
-          toast.error("⚠️ Erro ao carregar emoções. Exibindo mock.");
-        }
-      } catch (error) {
-        console.error("Erro ao buscar emoções:", error);
-        setEmotions(mockEmotions);
-        toast.error("⚠️ Erro inesperado. Exibindo mock.");
-      }
+  // Variável para controlar o tempo da última chamada
+  const lastFetchTimeRef = useRef({
+    teamEmotions: 0,
+    emotions: 0,
+    emotionRecords: 0,
+    allEmotions: 0
+  });
+  
+  // Memoizar as funções para evitar recriações desnecessárias
+  const fetchEmotions = useCallback(async () => {
+    // Evitar chamadas duplicadas em um curto período de tempo (500ms)
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current.emotions < 500) {
+      console.log("fetchEmotions - Chamada ignorada (muito frequente)");
+      return;
     }
-    else {
-      toast.error("⚠️ Erro ao carregar informações do user.");
-    }
-  };
-
-  const fetchEmotionRecords = async () => {
-    if (!user) return;
+    
+    lastFetchTimeRef.current.emotions = now;
+    console.log("fetchEmotions - Iniciando busca de emoções");
+    
     try {
-      const response = await fetch(`${API_URL}/emotion_record/`, {
+      // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+      let teamId = user?.team_id;
+      
+      if (!teamId) {
+        // Tentar obter o ID do time da URL
+        const pathParts = window.location.pathname.split('/');
+        const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+        
+        if (!isNaN(idFromUrl)) {
+          teamId = idFromUrl;
+          console.log("fetchEmotions - Team ID obtido da URL:", teamId);
+        } else {
+          console.log("fetchEmotions - Não foi possível determinar o ID do time");
+          setEmotions(mockEmotions);
+          toast.info("⚡ Exibindo emoções de exemplo.");
+          return;
+        }
+      }
+      
+      // Usar o endpoint específico para buscar emoções do time
+      const response = await fetch(`${API_URL}/teams/${teamId}/emotions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.emotions && data.emotions.length > 0) {
+          console.log(`Encontradas ${data.emotions.length} emoções para o time ${teamId}`);
+          setEmotions(data.emotions);
+        } else {
+          console.log("Nenhuma emoção encontrada para este time, usando mock");
+          setEmotions(mockEmotions);
+          toast.info("⚡ Exibindo emoções de exemplo.");
+        }
+      } else {
+        console.error("Erro ao buscar emoções:", response.status, response.statusText);
+        setEmotions(mockEmotions);
+        toast.error("⚠️ Erro ao carregar emoções. Exibindo mock.");
+      }
+    } catch (error) {
+      console.error("Erro ao buscar emoções:", error);
+      setEmotions(mockEmotions);
+      toast.error("⚠️ Erro inesperado. Exibindo mock.");
+    }
+  }, [user, API_URL]);
+
+  const fetchEmotionRecords = useCallback(async () => {
+    // Evitar chamadas duplicadas em um curto período de tempo (500ms)
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current.emotionRecords < 500) {
+      console.log("fetchEmotionRecords - Chamada ignorada (muito frequente)");
+      return;
+    }
+    
+    lastFetchTimeRef.current.emotionRecords = now;
+    console.log("fetchEmotionRecords - Iniciando busca de registros");
+    
+    try {
+      // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+      let teamId = user?.team_id;
+      
+      if (!teamId) {
+        // Tentar obter o ID do time da URL
+        const pathParts = window.location.pathname.split('/');
+        const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+        
+        if (!isNaN(idFromUrl)) {
+          teamId = idFromUrl;
+          console.log("fetchEmotionRecords - Team ID obtido da URL:", teamId);
+        } else {
+          console.log("fetchEmotionRecords - Não foi possível determinar o ID do time");
+          setEmotionRecords(mockEmotionRecords);
+          toast.info("📚 Exibindo registros de exemplo.");
+          return;
+        }
+      }
+
+      const response = await fetch(`${API_URL}/teams/${teamId}/emotion-records`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (response.ok) {
@@ -134,19 +199,58 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, API_URL]);
 
-  const fetchTeamEmotions = async () => {
-    if (!user?.team_id) return;
+  const fetchTeamEmotions = useCallback(async () => {
+    // Evitar chamadas duplicadas em um curto período de tempo (500ms)
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current.teamEmotions < 500) {
+      console.log("fetchTeamEmotions - Chamada ignorada (muito frequente)");
+      return;
+    }
+    
+    lastFetchTimeRef.current.teamEmotions = now;
+    console.log("fetchTeamEmotions - Iniciando busca de emoções do time");
+    
     try {
-      const response = await fetch(`${API_URL}/teams/${user.team_id}/emotions`, {
+      // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+      let teamId = user?.team_id;
+      
+      if (!teamId) {
+        // Tentar obter o ID do time da URL
+        const pathParts = window.location.pathname.split('/');
+        const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+        
+        if (!isNaN(idFromUrl)) {
+          teamId = idFromUrl;
+          console.log("fetchTeamEmotions - Team ID obtido da URL:", teamId);
+        } else {
+          console.log("fetchTeamEmotions - Não foi possível determinar o ID do time");
+          setTeamEmotions(mockEmotions);
+          toast.info("⚡ Exibindo emoções do time (mock).");
+          return;
+        }
+      }
+      
+      // Usar o endpoint específico para buscar emoções do time
+      console.log(`fetchTeamEmotions - Buscando emoções para o time ${teamId}`);
+      const response = await fetch(`${API_URL}/teams/${teamId}/emotions`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
+      
       if (response.ok) {
         const data = await response.json();
-        setTeamEmotions(data.emotions.length ? data.emotions : mockEmotions);
-        if (data.emotions.length === 0) toast.info("⚡ Exibindo emoções do time (mock).");
+        
+        if (data.emotions && data.emotions.length > 0) {
+          console.log(`Encontradas ${data.emotions.length} emoções para o time ${teamId}`);
+          setTeamEmotions(data.emotions);
+        } else {
+          console.log("Nenhuma emoção encontrada para este time, usando mock");
+          setTeamEmotions(mockEmotions);
+          toast.info("⚡ Exibindo emoções do time (mock).");
+        }
       } else {
+        console.error("Erro ao buscar emoções:", response.status, response.statusText);
         setTeamEmotions(mockEmotions);
         toast.error("⚠️ Erro ao carregar as emoções do time. Exibindo mock.");
       }
@@ -155,51 +259,124 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       setTeamEmotions(mockEmotions);
       toast.error("⚠️ Erro inesperado ao carregar emoções do time.");
     }
-  };
+  }, [user, API_URL]);
 
-  const fetchAllEmotions = async () => {
+  const fetchAllEmotions = useCallback(async () => {
+    // Evitar chamadas duplicadas em um curto período de tempo (500ms)
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current.allEmotions < 500) {
+      console.log("fetchAllEmotions - Chamada ignorada (muito frequente)");
+      return;
+    }
+    
+    lastFetchTimeRef.current.allEmotions = now;
+    console.log("fetchAllEmotions - Iniciando busca de todas as emoções");
+    
     try {
-      const response = await fetch(`${API_URL}/emotion/`, {
+      const response = await fetch(`${API_URL}/emotions`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       
       if (response.ok) {
         const data = await response.json();
-        setAllEmotions(data.emotions);
-        if (data.emotions.length === 0) {
-          toast.info("⚠️ Nenhuma emoção disponível encontrada.");
+        if (data.emotions && data.emotions.length > 0) {
+          setAllEmotions(data.emotions);
+        } else {
+          // Usar o mock de emoções quando não há dados da API
+          setAllEmotions(mockEmotions);
+          toast.info("⚡ Exibindo emoções de exemplo.");
         }
       } else {
+        // Usar o mock de emoções em caso de erro
+        setAllEmotions(mockEmotions);
+        toast.info("⚡ Exibindo emoções de exemplo.");
         toast.error("⚠️ Erro ao carregar todas as emoções disponíveis.");
       }
     } catch (error) {
       console.error("Erro ao buscar todas as emoções:", error);
-      toast.error("⚠️ Erro inesperado ao carregar emoções disponíveis.");
+      setAllEmotions(mockEmotions);
+      toast.error("⚠️ Erro inesperado ao carregar emoções.");
     }
-  };
+  }, [API_URL]);
 
-  const updateTeamEmotions = async (selectedEmotionIds: number[]): Promise<boolean> => {
-    if (!user?.team_id || user.role !== "manager" || selectedEmotionIds.length !== 6) {
+  const updateTeamEmotions = useCallback(async (selectedEmotionIds: number[]): Promise<boolean> => {
+    console.log("updateTeamEmotions - IDs recebidos:", selectedEmotionIds);
+    console.log("updateTeamEmotions - Quantidade de IDs:", selectedEmotionIds.length);
+    console.log("updateTeamEmotions - user:", user);
+    
+    // Verificar se o array de IDs está vazio ou não é um array
+    if (!Array.isArray(selectedEmotionIds)) {
+      console.error("updateTeamEmotions - selectedEmotionIds não é um array");
+      toast.error("⚠️ Erro: formato inválido de emoções selecionadas.");
+      return false;
+    }
+    
+    // Verificar se o usuário é gerente
+    if (user?.role !== "manager") {
+      console.log("updateTeamEmotions - Usuário não é gerente:", {
+        "user?.role": user?.role
+      });
+      toast.error("⚠️ Apenas gerentes podem atualizar as emoções do time.");
+      return false;
+    }
+    
+    // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+    let teamId = user?.team_id;
+    
+    if (!teamId) {
+      // Tentar obter o ID do time da URL
+      const pathParts = window.location.pathname.split('/');
+      const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+      
+      if (!isNaN(idFromUrl)) {
+        teamId = idFromUrl;
+        console.log("updateTeamEmotions - Team ID obtido da URL:", teamId);
+      } else {
+        console.error("updateTeamEmotions - Não foi possível determinar o ID do time");
+        toast.error("⚠️ Não foi possível determinar o ID do time.");
+        return false;
+      }
+    }
+    
+    console.log("updateTeamEmotions - Team ID determinado:", teamId);
+    
+    // Verificar se foram selecionadas exatamente 6 emoções
+    if (selectedEmotionIds.length !== 6) {
+      console.log("updateTeamEmotions - Número incorreto de emoções:", selectedEmotionIds.length);
       toast.error("⚠️ Você precisa selecionar exatamente 6 emoções para o time.");
       return false;
     }
 
     try {
-      const response = await fetch(`${API_URL}/teams/${user.team_id}/emotions`, {
+      // Exibir toast de carregamento
+      toast.loading("Atualizando emoções do time...", { id: "emotions-loading" });
+
+      // Usar o endpoint específico para atualizar as emoções do time
+      const response = await fetch(`${API_URL}/teams/${teamId}/emotions`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({ emotion_ids: selectedEmotionIds }),
+        body: JSON.stringify({
+          emotion_ids: selectedEmotionIds
+        }),
       });
 
+      // Remover toast de carregamento
+      toast.dismiss("emotions-loading");
+
       if (response.ok) {
+        const data = await response.json();
+        console.log("Emoções do time atualizadas com sucesso:", data);
         toast.success("🎉 Emoções do time atualizadas com sucesso!");
-        await fetchTeamEmotions(); // Recarrega as emoções do time após a atualização
+        
+        // Recarregar as emoções do time após o sucesso
+        await fetchTeamEmotions();
         return true;
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ message: "Erro ao processar resposta" }));
+        console.error("Erro ao atualizar emoções do time:", errorData);
         toast.error(`⚠️ Erro ao atualizar emoções do time: ${errorData.message || "Erro desconhecido"}`);
         return false;
       }
@@ -208,15 +385,21 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       toast.error("⚠️ Erro inesperado ao atualizar emoções do time.");
       return false;
     }
-  };
+  }, [user, API_URL, fetchTeamEmotions]);
 
-  const registerEmotion = async (
+  const registerEmotion = useCallback(async (
     emotionId: number,
     intensity: number,
     notes: string,
     isAnonymous: boolean
   ) => {
-    if (!user) return;
+    console.log("Iniciando registro de emoção:", { emotionId, intensity, isAnonymous });
+    
+    if (!user) {
+      toast.error("❌ Você precisa estar logado para registrar uma emoção.");
+      return;
+    }
+    
     const payload = {
       user_id: user.id,
       emotion_id: emotionId,
@@ -225,7 +408,10 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       is_anonymous: isAnonymous,
     };
 
+    console.log("Enviando payload:", payload);
+
     try {
+      // Usando o novo endpoint /emotion_record/ conforme a especificação da API
       const response = await fetch(`${API_URL}/emotion_record/`, {
         method: "POST",
         headers: {
@@ -235,48 +421,134 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error(`Erro: ${response.statusText}`);
+      console.log("Resposta da API:", { status: response.status, ok: response.ok });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        console.error("Erro detalhado:", errorData);
+        throw new Error(`Erro: ${errorData.message || response.statusText}`);
+      }
 
       const newRecord = await response.json();
+      console.log("Registro criado com sucesso:", newRecord);
+      
       setEmotionRecords((prev) => [newRecord, ...prev]);
-      toast.success("🎉 Emoção registrada com sucesso!", { duration: 3000 });
     } catch (error) {
       console.error("Erro ao registrar emoção:", error);
       toast.error("❌ Erro ao registrar emoção.");
+      throw error; // Propagar o erro para que o componente possa tratá-lo
     }
-  };
+  }, [user, API_URL, setEmotionRecords]);
 
-  const getEmotionDetails = (emotionId: number) =>
-    emotions.find((emotion) => emotion.id === emotionId);
+  const getEmotionDetails = useCallback((emotionId: number) =>
+    emotions.find((emotion) => emotion.id === emotionId), [emotions]);
 
-  useEffect(() => {
-    if (user) {
-      fetchEmotions();
-      fetchTeamEmotions();
-      fetchEmotionRecords();
-      if (user.role === "manager") {
-        fetchAllEmotions();
+  // Função para criar uma nova emoção
+  const createEmotion = useCallback(async (emotion: Omit<Emotion, 'id' | 'team_id'>): Promise<{ success: boolean; data?: Emotion; error?: string }> => {
+    // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+    let teamId = user?.team_id;
+    
+    if (!teamId) {
+      // Tentar obter o ID do time da URL
+      const pathParts = window.location.pathname.split('/');
+      const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+      
+      if (!isNaN(idFromUrl)) {
+        teamId = idFromUrl;
+        console.log("createEmotion - Team ID obtido da URL:", teamId);
+      } else {
+        console.error("createEmotion - Não foi possível determinar o ID do time");
+        return { success: false, error: "Não foi possível determinar o ID do time" };
       }
     }
-  }, [user]);
+
+    try {
+      const response = await fetch(`${API_URL}/teams/${teamId}/emotions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(emotion),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data: data as Emotion };
+      } else {
+        const errorData = await response.json();
+        return { 
+          success: false, 
+          error: errorData.message || "Erro desconhecido"
+        };
+      }
+    } catch (error) {
+      console.error("Erro ao criar emoção:", error);
+      return { 
+        success: false, 
+        error: "Erro de conexão ao criar emoção"
+      };
+    }
+  }, [user, API_URL]);
+
+  // Memoizar o valor do contexto para evitar renderizações desnecessárias
+  const contextValue = useMemo(() => ({
+    emotions,
+    emotionRecords,
+    teamEmotions,
+    allEmotions,
+    loading,
+    fetchEmotions,
+    fetchEmotionRecords,
+    fetchTeamEmotions,
+    fetchAllEmotions,
+    registerEmotion,
+    updateTeamEmotions,
+    getEmotionDetails,
+    createEmotion
+  }), [
+    emotions,
+    emotionRecords,
+    teamEmotions,
+    allEmotions,
+    loading,
+    fetchEmotions,
+    fetchEmotionRecords,
+    fetchTeamEmotions,
+    fetchAllEmotions,
+    registerEmotion,
+    updateTeamEmotions,
+    getEmotionDetails,
+    createEmotion
+  ]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Carregar dados básicos mesmo sem usuário
+        await fetchEmotions();
+        await fetchTeamEmotions();
+        
+        // Carregar registros de emoções e todas as emoções se o usuário estiver logado
+        if (user) {
+          await fetchEmotionRecords();
+          if (user.role === "manager") {
+            await fetchAllEmotions();
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados iniciais:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [user, fetchEmotions, fetchTeamEmotions, fetchEmotionRecords, fetchAllEmotions]);
 
   return (
-    <EmotionRecordContext.Provider
-      value={{
-        emotions,
-        emotionRecords,
-        teamEmotions,
-        allEmotions,
-        loading,
-        fetchEmotions,
-        fetchEmotionRecords,
-        fetchTeamEmotions,
-        fetchAllEmotions,
-        registerEmotion,
-        updateTeamEmotions,
-        getEmotionDetails,
-      }}
-    >
+    <EmotionRecordContext.Provider value={contextValue}>
       {children}
     </EmotionRecordContext.Provider>
   );

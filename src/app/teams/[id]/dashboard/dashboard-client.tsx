@@ -34,12 +34,13 @@ interface TeamEmotion {
 
 interface EmotionReport {
   id: number;
-  user_id: number;
+  user_id: number | null;
   emotion_id: number;
   intensity: number;
   notes: string;
   is_anonymous: boolean;
   created_at: string;
+  user_name?: string;
 }
 
 interface TeamResponse {
@@ -242,7 +243,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     
     // Filtra os registros pelo intervalo de datas selecionado e pelo usuário
     const filteredReports = filterReportsByDateRange(emotions_reports)
-      .filter(report => report.user_id === userId && !report.is_anonymous);
+      .filter(report => report.user_id !== null && report.user_id === userId && !report.is_anonymous);
     
     // Inicializa os contadores e acumuladores para cada emoção
     const emotionData = new Map<number, { count: number, intensities: number[] }>();

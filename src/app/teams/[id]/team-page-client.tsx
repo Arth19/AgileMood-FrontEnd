@@ -155,16 +155,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
+
   
   const getIntensityLabel = (intensity: number) => {
     switch (intensity) {
@@ -255,7 +246,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                               />
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                {member.name.charAt(0).toUpperCase()}
+                                {member.name?.charAt(0).toUpperCase()}
                               </div>
                             )}
                           </td>
@@ -289,7 +280,6 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="text-left p-3 border-b">Data</th>
                           <th className="text-left p-3 border-b">Emoção</th>
                           <th className="text-left p-3 border-b">Intensidade</th>
                           <th className="text-left p-3 border-b">Usuário</th>
@@ -302,13 +292,10 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                           // Encontrar a emoção correspondente
                           const emotion = teamData.emotions.find(e => e.id === report.emotion_id);
                           // Encontrar o usuário correspondente (se não for anônimo)
-                          const user = !report.is_anonymous && report.user_id 
-                            ? teamData.members.find(m => m.team_id === report.user_id) 
-                            : null;
+  
                           
                           return (
                             <tr key={report.id} className="hover:bg-gray-50">
-                              <td className="p-3 border-b">{formatDate(report.created_at)}</td>
                               <td className="p-3 border-b">
                                 <div className="flex items-center gap-2">
                                   {emotion ? (
@@ -327,10 +314,10 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 </span>
                               </td>
                               <td className="p-3 border-b">
-                                {report.is_anonymous ? (
+                                {report.user_name === null ? (
                                   <span className="text-gray-500">Anônimo</span>
-                                ) : user ? (
-                                  <span>{user.name}</span>
+                                ) : report.user_name ? (
+                                  <span>{report.user_name.charAt(0).toUpperCase() + report.user_name.slice(1)}</span>
                                 ) : (
                                   <span className="text-gray-500">Usuário não encontrado</span>
                                 )}

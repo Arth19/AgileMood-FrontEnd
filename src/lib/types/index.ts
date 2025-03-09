@@ -25,12 +25,13 @@ export interface TeamEmotion {
 
 export interface EmotionReport {
   id: number;
-  user_id: number;
+  user_id: number | null;
   emotion_id: number;
   intensity: number;
   notes: string;
   is_anonymous: boolean;
   created_at: string;
+  user_name?: string;
 }
 
 export interface CreateTeamDTO {

@@ -2,7 +2,7 @@
 
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, User, LogOut, Menu } from "lucide-react";
+import { Home, User, LogOut, Menu, Smile } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
@@ -44,6 +44,7 @@ export default function Sidebar() {
           <nav className="flex flex-col space-y-4">
             <NavItem href="/home" Icon={Home} label="Home" />
             <NavItem href="/profile" Icon={User} label="Perfil" />
+            <NavItem href="/emotions-demo" Icon={Smile} label="Demo de Emoções" />
             <button onClick={handleLogout} className="flex items-center space-x-2 hover:bg-red-600 p-2 rounded w-full">
               <LogOut size={20} />
               <span>Logout</span>
@@ -58,6 +59,7 @@ export default function Sidebar() {
         <nav className="flex flex-col space-y-4">
           <NavItem href="/home" Icon={Home} label="Home" />
           <NavItem href="/profile" Icon={User} label="Perfil" />
+          <NavItem href="/emotions-demo" Icon={Smile} label="Demo de Emoções" />
           <button onClick={handleLogout} className="flex items-center space-x-2 hover:bg-red-600 p-2 rounded w-full">
             <LogOut size={20} />
             <span>Logout</span>
