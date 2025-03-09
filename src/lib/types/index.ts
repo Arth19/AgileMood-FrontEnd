@@ -49,6 +49,7 @@ export interface TeamResponse {
   members: TeamMember[];
   emotions_reports: EmotionReport[];
   emotions: TeamEmotion[];
+  user_role?: "employee" | "manager";
 }
 
 export interface TeamsResponse {

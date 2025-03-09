@@ -27,16 +27,19 @@ interface EmotionRecordContextProps {
   emotions: Emotion[];
   emotionRecords: EmotionRecord[];
   teamEmotions: Emotion[];
+  allEmotions: Emotion[];
   loading: boolean;
   fetchEmotions: () => Promise<void>;
   fetchEmotionRecords: () => Promise<void>;
   fetchTeamEmotions: () => Promise<void>;
+  fetchAllEmotions: () => Promise<void>;
   registerEmotion: (
     emotionId: number,
     intensity: number,
     notes: string,
     isAnonymous: boolean
   ) => Promise<void>;
+  updateTeamEmotions: (selectedEmotionIds: number[]) => Promise<boolean>;
   getEmotionDetails: (emotionId: number) => Emotion | undefined;
 }
 
@@ -78,6 +81,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
   const [emotions, setEmotions] = useState<Emotion[]>([]);
   const [teamEmotions, setTeamEmotions] = useState<Emotion[]>([]);
   const [emotionRecords, setEmotionRecords] = useState<EmotionRecord[]>([]);
+  const [allEmotions, setAllEmotions] = useState<Emotion[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { user } = useAuthContext();
@@ -153,6 +157,59 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     }
   };
 
+  const fetchAllEmotions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/emotion/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAllEmotions(data.emotions);
+        if (data.emotions.length === 0) {
+          toast.info("⚠️ Nenhuma emoção disponível encontrada.");
+        }
+      } else {
+        toast.error("⚠️ Erro ao carregar todas as emoções disponíveis.");
+      }
+    } catch (error) {
+      console.error("Erro ao buscar todas as emoções:", error);
+      toast.error("⚠️ Erro inesperado ao carregar emoções disponíveis.");
+    }
+  };
+
+  const updateTeamEmotions = async (selectedEmotionIds: number[]): Promise<boolean> => {
+    if (!user?.team_id || user.role !== "manager" || selectedEmotionIds.length !== 6) {
+      toast.error("⚠️ Você precisa selecionar exatamente 6 emoções para o time.");
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/teams/${user.team_id}/emotions`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ emotion_ids: selectedEmotionIds }),
+      });
+
+      if (response.ok) {
+        toast.success("🎉 Emoções do time atualizadas com sucesso!");
+        await fetchTeamEmotions(); // Recarrega as emoções do time após a atualização
+        return true;
+      } else {
+        const errorData = await response.json();
+        toast.error(`⚠️ Erro ao atualizar emoções do time: ${errorData.message || "Erro desconhecido"}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar emoções do time:", error);
+      toast.error("⚠️ Erro inesperado ao atualizar emoções do time.");
+      return false;
+    }
+  };
+
   const registerEmotion = async (
     emotionId: number,
     intensity: number,
@@ -197,6 +254,9 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       fetchEmotions();
       fetchTeamEmotions();
       fetchEmotionRecords();
+      if (user.role === "manager") {
+        fetchAllEmotions();
+      }
     }
   }, [user]);
 
@@ -206,11 +266,14 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
         emotions,
         emotionRecords,
         teamEmotions,
+        allEmotions,
         loading,
         fetchEmotions,
         fetchEmotionRecords,
         fetchTeamEmotions,
+        fetchAllEmotions,
         registerEmotion,
+        updateTeamEmotions,
         getEmotionDetails,
       }}
     >
