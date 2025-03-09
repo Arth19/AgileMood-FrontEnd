@@ -225,6 +225,72 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     });
   }, []);
 
+  // Função para gerar um resumo do time baseado nos dados
+  const generateTeamSummary = useCallback((data: TeamResponse) => {
+    if (!data || !data.emotions_reports || !data.emotions) return "";
+    
+    const totalReports = data.emotions_reports.length;
+    const anonymousReports = data.emotions_reports.filter(report => report.is_anonymous).length;
+    const identifiedReports = totalReports - anonymousReports;
+    
+    // Calcular a emoção mais frequente
+    const emotionCounts = new Map<number, number>();
+    data.emotions_reports.forEach(report => {
+      emotionCounts.set(report.emotion_id, (emotionCounts.get(report.emotion_id) || 0) + 1);
+    });
+    
+    let mostFrequentEmotionId: number | null = null;
+    let maxCount = 0;
+    
+    emotionCounts.forEach((count, emotionId) => {
+      if (count > maxCount) {
+        maxCount = count;
+        mostFrequentEmotionId = emotionId;
+      }
+    });
+    
+    const mostFrequentEmotion = mostFrequentEmotionId 
+      ? data.emotions.find(e => e.id === mostFrequentEmotionId)
+      : null;
+    
+    // Calcular a intensidade média geral
+    const totalIntensity = data.emotions_reports.reduce((sum, report) => sum + report.intensity, 0);
+    const avgIntensity = totalReports > 0 ? (totalIntensity / totalReports).toFixed(1) : "0";
+    
+    // Calcular a proporção de emoções negativas
+    const negativeReports = data.emotions_reports.filter(report => {
+      const emotion = data.emotions.find(e => e.id === report.emotion_id);
+      return emotion?.is_negative;
+    }).length;
+    
+    const negativeRatio = totalReports > 0 ? (negativeReports / totalReports) * 100 : 0;
+    
+    // Gerar mensagem de resumo
+    let summary = `O time "${data.team_data.name}" possui ${data.members.length} membros e um total de ${totalReports} registros de emoções`;
+    
+    if (totalReports > 0) {
+      summary += `, sendo ${anonymousReports} anônimos (${Math.round((anonymousReports / totalReports) * 100)}%) e ${identifiedReports} identificados.`;
+      
+      if (mostFrequentEmotion) {
+        summary += ` A emoção mais frequente é "${mostFrequentEmotion.name}" ${mostFrequentEmotion.emoji} com ${maxCount} registros.`;
+      }
+      
+      summary += ` A intensidade média das emoções é ${avgIntensity}/5.`;
+      
+      if (negativeRatio > 50) {
+        summary += ` ATENÇÃO: ${Math.round(negativeRatio)}% das emoções registradas são negativas, o que pode indicar problemas no time.`;
+      } else if (negativeRatio > 30) {
+        summary += ` ${Math.round(negativeRatio)}% das emoções registradas são negativas, fique atento.`;
+      } else if (negativeRatio < 10) {
+        summary += ` Apenas ${Math.round(negativeRatio)}% das emoções registradas são negativas, o que é um bom sinal.`;
+      }
+    } else {
+      summary += `. Ainda não há registros de emoções para análise.`;
+    }
+    
+    return summary;
+  }, []);
+
   // Função para processar os registros de emoções e gerar a análise por usuário
   const generateUserEmotionAnalysis = useCallback((userId: number) => {
     if (!teamData) return null;
@@ -405,6 +471,11 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
+                      {/* Callout com resumo do time */}
+                      <div className="mb-6 p-4 border-l-4 border-blue-500 bg-blue-50 rounded-r-md">
+                        <p className="text-blue-800">{generateTeamSummary(teamData)}</p>
+                      </div>
+                      
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <span className="font-medium">Nome do Time:</span>
