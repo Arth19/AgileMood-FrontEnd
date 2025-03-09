@@ -43,6 +43,7 @@ interface EmotionRecordContextProps {
   updateTeamEmotions: (selectedEmotionIds: number[]) => Promise<boolean>;
   getEmotionDetails: (emotionId: number) => Emotion | undefined;
   createEmotion: (emotion: Omit<Emotion, 'id' | 'team_id'>) => Promise<{ success: boolean; data?: Emotion; error?: string }>;
+  createMultipleEmotions: (emotions: Array<Omit<Emotion, 'id' | 'team_id'>>) => Promise<{ success: boolean; createdCount: number; errors: string[] }>;
 }
 
 // 🌟 **Mock de Emoções**
@@ -299,6 +300,118 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     }
   }, [API_URL]);
 
+  // Função para criar múltiplas emoções
+  const createMultipleEmotions = useCallback(async (emotions: Array<Omit<Emotion, 'id' | 'team_id'>>): Promise<{ success: boolean; createdCount: number; errors: string[] }> => {
+    // Obter o team_id do parâmetro da URL se não estiver disponível no objeto do usuário
+    let teamId = user?.team_id;
+    
+    if (!teamId) {
+      // Tentar obter o ID do time da URL
+      const pathParts = window.location.pathname.split('/');
+      const idFromUrl = pathParts.length > 2 ? parseInt(pathParts[2], 10) : NaN;
+      
+      if (!isNaN(idFromUrl)) {
+        teamId = idFromUrl;
+        console.log("createMultipleEmotions - Team ID obtido da URL:", teamId);
+      } else {
+        console.error("createMultipleEmotions - Não foi possível determinar o ID do time");
+        return { 
+          success: false, 
+          createdCount: 0, 
+          errors: ["Não foi possível determinar o ID do time"] 
+        };
+      }
+    }
+
+    // Verificar se o usuário é gerente
+    if (user?.role !== "manager") {
+      console.log("createMultipleEmotions - Usuário não é gerente:", {
+        "user?.role": user?.role
+      });
+      return { 
+        success: false, 
+        createdCount: 0, 
+        errors: ["Apenas gerentes podem criar emoções para o time"] 
+      };
+    }
+
+    // Verificar se o array de emoções está vazio
+    if (!Array.isArray(emotions) || emotions.length === 0) {
+      console.error("createMultipleEmotions - Array de emoções vazio ou inválido");
+      return { 
+        success: false, 
+        createdCount: 0, 
+        errors: ["Nenhuma emoção para criar"] 
+      };
+    }
+
+    console.log(`createMultipleEmotions - Iniciando criação de ${emotions.length} emoções para o time ${teamId}`);
+    
+    // Exibir toast de carregamento
+    toast.loading(`Criando ${emotions.length} emoções para o time...`, { id: "emotions-loading" });
+
+    const results = [];
+    const errors = [];
+    let createdCount = 0;
+
+    // Fazer um POST para cada emoção
+    for (const emotion of emotions) {
+      try {
+        const emotionWithTeamId = {
+          ...emotion,
+          team_id: teamId
+        };
+
+        console.log("Criando emoção:", emotionWithTeamId);
+
+        const response = await fetch(`${API_URL}/emotion/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(emotionWithTeamId),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          results.push(data);
+          createdCount++;
+          console.log(`Emoção "${emotion.name}" criada com sucesso:`, data);
+        } else {
+          const errorData = await response.json().catch(() => ({ message: "Erro ao processar resposta" }));
+          const errorMessage = `Erro ao criar emoção "${emotion.name}": ${errorData.message || "Erro desconhecido"}`;
+          console.error(errorMessage);
+          errors.push(errorMessage);
+        }
+      } catch (error) {
+        const errorMessage = `Erro de conexão ao criar emoção "${emotion.name}"`;
+        console.error(errorMessage, error);
+        errors.push(errorMessage);
+      }
+    }
+
+    // Remover toast de carregamento
+    toast.dismiss("emotions-loading");
+
+    // Recarregar as emoções do time após o sucesso
+    if (createdCount > 0) {
+      await fetchTeamEmotions();
+      toast.success(`🎉 ${createdCount} emoções criadas com sucesso!`);
+    }
+
+    // Exibir erros, se houver
+    if (errors.length > 0) {
+      toast.error(`⚠️ ${errors.length} emoções não puderam ser criadas.`);
+    }
+
+    return {
+      success: createdCount > 0,
+      createdCount,
+      errors
+    };
+  }, [user, API_URL, fetchTeamEmotions]);
+
   const updateTeamEmotions = useCallback(async (selectedEmotionIds: number[]): Promise<boolean> => {
     console.log("updateTeamEmotions - IDs recebidos:", selectedEmotionIds);
     console.log("updateTeamEmotions - Quantidade de IDs:", selectedEmotionIds.length);
@@ -351,41 +464,88 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       // Exibir toast de carregamento
       toast.loading("Atualizando emoções do time...", { id: "emotions-loading" });
 
-      // Usar o endpoint específico para atualizar as emoções do time
-      const response = await fetch(`${API_URL}/teams/${teamId}/emotions`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          emotion_ids: selectedEmotionIds
-        }),
-      });
-
+      const results = [];
+      const errors = [];
+      
+      // Para cada emoção selecionada, fazer um POST individual
+      for (const emotionId of selectedEmotionIds) {
+        try {
+          // Obter os detalhes da emoção
+          const emotionDetails = allEmotions.find(e => e.id === emotionId);
+          
+          if (!emotionDetails) {
+            console.error(`Emoção com ID ${emotionId} não encontrada`);
+            errors.push(`Emoção com ID ${emotionId} não encontrada`);
+            continue;
+          }
+          
+          // Preparar o payload para esta emoção
+          const payload = {
+            name: emotionDetails.name,
+            emoji: emotionDetails.emoji,
+            color: emotionDetails.color,
+            team_id: teamId,
+            is_negative: emotionDetails.is_negative
+          };
+          
+          console.log(`Enviando POST para emoção ${emotionId}:`, payload);
+          
+          // Fazer o POST para esta emoção
+          const response = await fetch(`${API_URL}/emotion`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify(payload),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Emoção ${emotionId} atualizada com sucesso:`, data);
+            results.push(data);
+          } else {
+            const errorData = await response.json().catch(() => ({ message: "Erro ao processar resposta" }));
+            const errorMessage = `Erro ao atualizar emoção ${emotionId}: ${errorData.message || "Erro desconhecido"}`;
+            console.error(errorMessage);
+            errors.push(errorMessage);
+          }
+        } catch (error) {
+          const errorMessage = `Erro de conexão ao atualizar emoção ${emotionId}`;
+          console.error(errorMessage, error);
+          errors.push(errorMessage);
+        }
+      }
+      
       // Remover toast de carregamento
       toast.dismiss("emotions-loading");
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Emoções do time atualizadas com sucesso:", data);
-        toast.success("🎉 Emoções do time atualizadas com sucesso!");
+      
+      // Verificar resultados
+      if (results.length > 0) {
+        console.log(`${results.length} emoções atualizadas com sucesso`);
+        toast.success(`🎉 ${results.length} emoções atualizadas com sucesso!`);
         
         // Recarregar as emoções do time após o sucesso
         await fetchTeamEmotions();
         return true;
-      } else {
-        const errorData = await response.json().catch(() => ({ message: "Erro ao processar resposta" }));
-        console.error("Erro ao atualizar emoções do time:", errorData);
-        toast.error(`⚠️ Erro ao atualizar emoções do time: ${errorData.message || "Erro desconhecido"}`);
-        return false;
       }
+      
+      // Se chegou aqui, algo deu errado
+      if (errors.length > 0) {
+        console.error(`${errors.length} erros ao atualizar emoções:`, errors);
+        toast.error(`⚠️ ${errors.length} erros ao atualizar emoções.`);
+      } else {
+        toast.error("⚠️ Nenhuma emoção foi atualizada.");
+      }
+      
+      return false;
     } catch (error) {
       console.error("Erro ao atualizar emoções do time:", error);
+      toast.dismiss("emotions-loading");
       toast.error("⚠️ Erro inesperado ao atualizar emoções do time.");
       return false;
     }
-  }, [user, API_URL, fetchTeamEmotions]);
+  }, [user, API_URL, fetchTeamEmotions, allEmotions]);
 
   const registerEmotion = useCallback(async (
     emotionId: number,
@@ -505,7 +665,8 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     registerEmotion,
     updateTeamEmotions,
     getEmotionDetails,
-    createEmotion
+    createEmotion,
+    createMultipleEmotions
   }), [
     emotions,
     emotionRecords,
@@ -519,7 +680,8 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     registerEmotion,
     updateTeamEmotions,
     getEmotionDetails,
-    createEmotion
+    createEmotion,
+    createMultipleEmotions
   ]);
 
   useEffect(() => {
