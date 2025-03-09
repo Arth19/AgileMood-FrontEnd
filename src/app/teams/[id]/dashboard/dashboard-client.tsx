@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
@@ -9,9 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "sonner";
 import { useRouter } from "next/navigation";
-import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { ptBR } from "date-fns/locale";
 
 // Interfaces para os tipos do time
 interface TeamMember {
@@ -103,10 +100,6 @@ interface DashboardClientProps {
 export default function DashboardClient({ teamId }: DashboardClientProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)), // Últimos 30 dias
-    to: new Date(),
-  });
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [emojiDistribution, setEmojiDistribution] = useState<EmojiDistributionResponse | null>(null);
@@ -117,132 +110,132 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
   
   const router = useRouter();
 
-  // Função para processar os registros de emoções e gerar a distribuição de emojis
-  const generateEmojiDistribution = () => {
-    if (!teamData) return null;
-    
-    const { emotions_reports, emotions } = teamData;
-    
-    // Filtra os registros pelo intervalo de datas selecionado
-    const filteredReports = filterReportsByDateRange(emotions_reports);
-    
-    // Inicializa o contador para cada emoção
-    const emotionCounts = new Map<number, number>();
-    emotions.forEach(emotion => emotionCounts.set(emotion.id, 0));
-    
-    // Conta a frequência de cada emoção
-    filteredReports.forEach(report => {
-      const count = emotionCounts.get(report.emotion_id) || 0;
-      emotionCounts.set(report.emotion_id, count + 1);
-    });
-    
-    // Formata os dados para o formato esperado
-    const distribution: EmojiDistribution[] = emotions.map(emotion => {
-      const frequency = emotionCounts.get(emotion.id) || 0;
-      return {
-        emotion_name: `${emotion.emoji} ${emotion.name}`,
-        frequency
-      };
-    }).sort((a, b) => b.frequency - a.frequency); // Ordena por frequência decrescente
-    
-    // Calcula a proporção de emoções negativas
-    const totalFrequency = distribution.reduce((sum, item) => sum + item.frequency, 0);
-    const negativeFrequency = emotions
-      .filter(emotion => emotion.is_negative)
-      .reduce((sum, emotion) => {
-        return sum + (emotionCounts.get(emotion.id) || 0);
-      }, 0);
-    
-    const negativeRatio = totalFrequency > 0 ? negativeFrequency / totalFrequency : 0;
-    
-    // Gera um alerta se a proporção de emoções negativas for alta
-    let alert = "";
-    if (negativeRatio > 0.6) {
-      alert = "Atenção! A proporção de emoções negativas está muito alta. Considere realizar ações para melhorar o clima do time.";
-    } else if (negativeRatio > 0.4) {
-      alert = "A proporção de emoções negativas está moderadamente alta. Monitore a situação.";
-    }
-    
-    return {
-      emoji_distribution: distribution,
-      negative_emotion_ratio: negativeRatio,
-      alert
-    };
-  };
+  // Função para processar os dados do time e gerar estatísticas
+  const processTeamData = useCallback((data: TeamResponse) => {
+    if (!data || !data.emotions_reports || !data.emotions) return;
 
-  // Função para processar os registros de emoções e gerar a intensidade média
-  const generateAverageIntensity = () => {
-    if (!teamData) return null;
-    
-    const { emotions_reports, emotions } = teamData;
-    
-    // Filtra os registros pelo intervalo de datas selecionado
-    const filteredReports = filterReportsByDateRange(emotions_reports);
-    
-    // Inicializa os acumuladores para cada emoção
-    const emotionIntensities = new Map<number, number[]>();
-    emotions.forEach(emotion => emotionIntensities.set(emotion.id, []));
-    
-    // Acumula as intensidades para cada emoção
-    filteredReports.forEach(report => {
-      const intensities = emotionIntensities.get(report.emotion_id) || [];
-      intensities.push(report.intensity);
-      emotionIntensities.set(report.emotion_id, intensities);
-    });
-    
-    // Calcula a intensidade média para cada emoção
-    const intensities: AverageIntensity[] = emotions.map(emotion => {
-      const intensityValues = emotionIntensities.get(emotion.id) || [];
-      const avgIntensity = intensityValues.length > 0
-        ? intensityValues.reduce((sum, val) => sum + val, 0) / intensityValues.length
-        : 0;
+    // Processamento para distribuição de emojis
+    const emotionCounts = new Map<number, number>();
+    let negativeCount = 0;
+    let totalCount = 0;
+
+    data.emotions_reports.forEach(report => {
+      const emotionId = report.emotion_id;
+      emotionCounts.set(emotionId, (emotionCounts.get(emotionId) || 0) + 1);
       
-      return {
-        emotion_name: `${emotion.emoji} ${emotion.name}`,
-        avg_intensity: Number(avgIntensity.toFixed(1))
-      };
-    }).sort((a, b) => b.avg_intensity - a.avg_intensity); // Ordena por intensidade decrescente
-    
-    // Calcula a proporção de intensidade de emoções negativas
-    const totalIntensity = intensities.reduce((sum, item) => sum + item.avg_intensity, 0);
-    const negativeIntensity = emotions
-      .filter(emotion => emotion.is_negative)
-      .reduce((sum, emotion) => {
-        const intensityValues = emotionIntensities.get(emotion.id) || [];
-        const avgIntensity = intensityValues.length > 0
-          ? intensityValues.reduce((sum, val) => sum + val, 0) / intensityValues.length
-          : 0;
-        return sum + avgIntensity;
-      }, 0);
-    
-    const negativeRatio = totalIntensity > 0 ? negativeIntensity / totalIntensity : 0;
-    
-    // Gera um alerta se a intensidade média de emoções negativas for alta
+      const emotion = data.emotions.find(e => e.id === emotionId);
+      if (emotion?.is_negative) {
+        negativeCount++;
+      }
+      totalCount++;
+    });
+
+    const emojiDistributionData: EmojiDistribution[] = [];
+    data.emotions.forEach(emotion => {
+      const count = emotionCounts.get(emotion.id) || 0;
+      if (count > 0) {
+        emojiDistributionData.push({
+          emotion_name: `${emotion.emoji} ${emotion.name}`,
+          frequency: count
+        });
+      }
+    });
+
+    // Ordenar por frequência
+    emojiDistributionData.sort((a, b) => b.frequency - a.frequency);
+
+    const negativeRatio = totalCount > 0 ? negativeCount / totalCount : 0;
     let alert = "";
-    if (negativeRatio > 0.6) {
-      alert = "Atenção! A intensidade das emoções negativas está muito alta. Isso pode indicar problemas sérios no time.";
-    } else if (negativeRatio > 0.4) {
-      alert = "A intensidade das emoções negativas está moderadamente alta. Considere investigar as causas.";
+    if (negativeRatio > 0.5) {
+      alert = "Atenção: Mais de 50% das emoções registradas são negativas. Pode ser necessário uma intervenção.";
     }
-    
-    return {
-      average_intensity: intensities,
+
+    setEmojiDistribution({
+      emoji_distribution: emojiDistributionData,
       negative_emotion_ratio: negativeRatio,
       alert
-    };
-  };
+    });
+
+    // Processamento para intensidade média
+    const emotionIntensities = new Map<number, number[]>();
+    
+    data.emotions_reports.forEach(report => {
+      const emotionId = report.emotion_id;
+      const intensities = emotionIntensities.get(emotionId) || [];
+      intensities.push(report.intensity);
+      emotionIntensities.set(emotionId, intensities);
+    });
+
+    const averageIntensityData: AverageIntensity[] = [];
+    data.emotions.forEach(emotion => {
+      const intensities = emotionIntensities.get(emotion.id) || [];
+      if (intensities.length > 0) {
+        const avgIntensity = intensities.reduce((sum, val) => sum + val, 0) / intensities.length;
+        averageIntensityData.push({
+          emotion_name: `${emotion.emoji} ${emotion.name}`,
+          avg_intensity: Number(avgIntensity.toFixed(1))
+        });
+      }
+    });
+
+    // Ordenar por intensidade média
+    averageIntensityData.sort((a, b) => b.avg_intensity - a.avg_intensity);
+
+    setAverageIntensity({
+      average_intensity: averageIntensityData,
+      negative_emotion_ratio: negativeRatio,
+      alert
+    });
+
+    // Processamento para registros anônimos
+    const anonymousReports = data.emotions_reports.filter(report => report.is_anonymous);
+    const anonymousEmotionCounts = new Map<number, number>();
+    const anonymousEmotionIntensities = new Map<number, number[]>();
+
+    anonymousReports.forEach(report => {
+      const emotionId = report.emotion_id;
+      anonymousEmotionCounts.set(emotionId, (anonymousEmotionCounts.get(emotionId) || 0) + 1);
+      
+      const intensities = anonymousEmotionIntensities.get(emotionId) || [];
+      intensities.push(report.intensity);
+      anonymousEmotionIntensities.set(emotionId, intensities);
+    });
+
+    const anonymousRecordsData: UserEmotionRecord[] = [];
+    data.emotions.forEach(emotion => {
+      const count = anonymousEmotionCounts.get(emotion.id) || 0;
+      if (count > 0) {
+        const intensities = anonymousEmotionIntensities.get(emotion.id) || [];
+        const avgIntensity = intensities.reduce((sum, val) => sum + val, 0) / intensities.length;
+        
+        anonymousRecordsData.push({
+          emotion_name: `${emotion.emoji} ${emotion.name}`,
+          frequency: count,
+          avg_intensity: Number(avgIntensity.toFixed(1))
+        });
+      }
+    });
+
+    // Ordenar por frequência
+    anonymousRecordsData.sort((a, b) => b.frequency - a.frequency);
+
+    setAnonymousRecords({
+      user_name: "Anônimo",
+      all_user_emotion_records: anonymousRecordsData
+    });
+  }, []);
 
   // Função para processar os registros de emoções e gerar a análise por usuário
-  const generateUserEmotionAnalysis = (userId: number) => {
+  const generateUserEmotionAnalysis = useCallback((userId: number) => {
     if (!teamData) return null;
     
     const { emotions_reports, emotions, members } = teamData;
-    const user = members.find(member => member.team_id === userId);
+    const user = members.find(member => member.id === userId);
     
     if (!user) return null;
     
-    // Filtra os registros pelo intervalo de datas selecionado e pelo usuário
-    const filteredReports = filterReportsByDateRange(emotions_reports)
+    // Filtra os registros pelo usuário (sem filtro de data)
+    const filteredReports = emotions_reports
       .filter(report => report.user_id !== null && report.user_id === userId && !report.is_anonymous);
     
     // Inicializa os contadores e acumuladores para cada emoção
@@ -276,63 +269,10 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
       user_name: user.name,
       all_user_emotion_records: records
     };
-  };
-
-  // Função para processar os registros de emoções anônimos
-  const generateAnonymousRecords = () => {
-    if (!teamData) return null;
-    
-    const { emotions_reports, emotions } = teamData;
-    
-    // Filtra os registros pelo intervalo de datas selecionado e que são anônimos
-    const filteredReports = filterReportsByDateRange(emotions_reports)
-      .filter(report => report.is_anonymous);
-    
-    // Inicializa os contadores e acumuladores para cada emoção
-    const emotionData = new Map<number, { count: number, intensities: number[] }>();
-    emotions.forEach(emotion => emotionData.set(emotion.id, { count: 0, intensities: [] }));
-    
-    // Processa os registros
-    filteredReports.forEach(report => {
-      const data = emotionData.get(report.emotion_id) || { count: 0, intensities: [] };
-      data.count += 1;
-      data.intensities.push(report.intensity);
-      emotionData.set(report.emotion_id, data);
-    });
-    
-    // Formata os dados para o formato esperado
-    const records: UserEmotionRecord[] = emotions.map(emotion => {
-      const data = emotionData.get(emotion.id) || { count: 0, intensities: [] };
-      const avgIntensity = data.intensities.length > 0
-        ? data.intensities.reduce((sum, val) => sum + val, 0) / data.intensities.length
-        : 0;
-      
-      return {
-        emotion_name: `${emotion.emoji} ${emotion.name}`,
-        frequency: data.count,
-        avg_intensity: Number(avgIntensity.toFixed(1))
-      };
-    }).filter(record => record.frequency > 0) // Remove emoções sem registros
-      .sort((a, b) => b.frequency - a.frequency); // Ordena por frequência decrescente
-    
-    return {
-      user_name: "Registros Anônimos",
-      all_user_emotion_records: records
-    };
-  };
-
-  // Função auxiliar para filtrar registros pelo intervalo de datas
-  const filterReportsByDateRange = (reports: EmotionReport[]) => {
-    if (!dateRange?.from || !dateRange?.to) return reports;
-    
-    return reports.filter(report => {
-      const reportDate = new Date(report.created_at);
-      return reportDate >= dateRange.from! && reportDate <= dateRange.to!;
-    });
-  };
+  }, [teamData]);
 
   // Buscar dados do time
-  const fetchTeamData = async () => {
+  const fetchTeamData = useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       if (!apiUrl) {
@@ -355,8 +295,12 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
       const data = await response.json();
       setTeamData(data);
       setMembers(data.members);
+      
+      // Processar os dados do time para gerar estatísticas
+      processTeamData(data);
+      
       if (data.members.length > 0) {
-        setSelectedMemberId(data.members[0].team_id);
+        setSelectedMemberId(data.members[0].id);
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -365,38 +309,10 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
         setError(new Error('Erro desconhecido ao buscar dados do time'));
       }
     }
-  };
-
-  // Processar dados para o dashboard
-  const processData = () => {
-    if (!teamData) return;
-    
-    // Gera os dados para o dashboard a partir dos registros de emoções
-    const emojiDistributionData = generateEmojiDistribution();
-    if (emojiDistributionData) {
-      setEmojiDistribution(emojiDistributionData);
-    }
-    
-    const averageIntensityData = generateAverageIntensity();
-    if (averageIntensityData) {
-      setAverageIntensity(averageIntensityData);
-    }
-    
-    const anonymousRecordsData = generateAnonymousRecords();
-    if (anonymousRecordsData) {
-      setAnonymousRecords(anonymousRecordsData);
-    }
-    
-    if (selectedMemberId) {
-      const userEmotionAnalysisData = generateUserEmotionAnalysis(selectedMemberId);
-      if (userEmotionAnalysisData) {
-        setUserEmotionAnalysis(userEmotionAnalysisData);
-      }
-    }
-  };
+  }, [teamId, processTeamData]);
 
   // Buscar todos os dados
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
       await fetchTeamData();
@@ -409,19 +325,12 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
         setError(new Error('Erro desconhecido ao buscar dados'));
       }
     }
-  };
+  }, [fetchTeamData]);
 
   // Efeito para buscar dados quando a página carrega
   useEffect(() => {
     fetchAllData();
-  }, [teamId]);
-
-  // Efeito para processar dados quando o teamData é carregado ou o intervalo de datas muda
-  useEffect(() => {
-    if (teamData && !loading) {
-      processData();
-    }
-  }, [teamData, dateRange]);
+  }, [teamId, fetchAllData]);
 
   // Efeito para processar dados quando o membro selecionado muda
   useEffect(() => {
@@ -431,7 +340,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
         setUserEmotionAnalysis(userEmotionAnalysisData);
       }
     }
-  }, [selectedMemberId, teamData]);
+  }, [selectedMemberId, teamData, generateUserEmotionAnalysis, loading]);
 
   if (loading) {
     return (
@@ -470,12 +379,6 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                 <p className="text-gray-600">Análise de emoções e sentimentos do time</p>
               </div>
               <div className="flex items-center gap-4">
-                <DateRangePicker
-                  value={dateRange}
-                  onChange={setDateRange}
-                  locale={ptBR}
-                  placeholder="Selecione um período"
-                />
                 <Button onClick={() => router.push(`/teams/${teamId}`)}>
                   Voltar para o Time
                 </Button>
@@ -492,6 +395,46 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
 
               {/* Aba de Visão Geral */}
               <TabsContent value="overview" className="space-y-6">
+                {/* Card de Informações do Time */}
+                {teamData && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Informações do Time</CardTitle>
+                      <CardDescription>
+                        Dados gerais e estatísticas do time
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Nome do Time:</span>
+                          <span>{teamData.team_data.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Total de Membros:</span>
+                          <span>{teamData.members.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Total de Registros de Emoções:</span>
+                          <span>{teamData.emotions_reports.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Registros Anônimos:</span>
+                          <span>{teamData.emotions_reports.filter(report => report.is_anonymous).length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Registros Identificados:</span>
+                          <span>{teamData.emotions_reports.filter(report => !report.is_anonymous).length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Data de Criação:</span>
+                          <span>{new Date(teamData.team_data.created_at).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Card de Distribuição de Emoções */}
                   <Card>
@@ -625,6 +568,57 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Card de Emoções Recentes */}
+                {teamData && teamData.emotions_reports.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Emoções Recentes</CardTitle>
+                      <CardDescription>
+                        Últimos registros de emoções no time
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {teamData.emotions_reports
+                          .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+                          .slice(0, 5)
+                          .map((report, index) => {
+                            const emotion = teamData.emotions.find(e => e.id === report.emotion_id);
+                            const userName = report.is_anonymous 
+                              ? 'Anônimo' 
+                              : report.user_name || teamData.members.find(m => m.id === report.user_id)?.name || 'Usuário';
+                            
+                            return (
+                              <div key={index} className="p-3 rounded-lg border" style={{ borderColor: emotion?.color || '#e2e8f0' }}>
+                                <div className="flex justify-between items-center mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">{emotion?.emoji}</span>
+                                    <span className="font-medium">{emotion?.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-500">Intensidade:</span>
+                                    <span className="text-sm font-medium">{report.intensity}/5</span>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                  <span>{userName}</span>
+                                  <span className="text-gray-500">
+                                    {report.created_at ? new Date(report.created_at).toLocaleString('pt-BR') : 'Data não disponível'}
+                                  </span>
+                                </div>
+                                {report.notes && (
+                                  <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                                    {report.notes}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               {/* Aba de Distribuição de Emoções */}
@@ -822,6 +816,101 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Card de Visão Geral dos Membros */}
+                {teamData && teamData.members.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Visão Geral dos Membros</CardTitle>
+                      <CardDescription>
+                        Distribuição de emoções por membro do time
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        {teamData.members.map(member => {
+                          // Filtrar relatórios para este membro
+                          const memberReports = teamData.emotions_reports.filter(
+                            report => !report.is_anonymous && report.user_id === member.id
+                          );
+                          
+                          // Contar emoções
+                          const emotionCounts = new Map<number, number>();
+                          memberReports.forEach(report => {
+                            emotionCounts.set(report.emotion_id, (emotionCounts.get(report.emotion_id) || 0) + 1);
+                          });
+                          
+                          // Encontrar a emoção mais frequente
+                          let mostFrequentEmotionId: number | null = null;
+                          let maxCount = 0;
+                          
+                          emotionCounts.forEach((count, emotionId) => {
+                            if (count > maxCount) {
+                              maxCount = count;
+                              mostFrequentEmotionId = emotionId;
+                            }
+                          });
+                          
+                          const mostFrequentEmotion = mostFrequentEmotionId 
+                            ? teamData.emotions.find(e => e.id === mostFrequentEmotionId)
+                            : null;
+                          
+                          return (
+                            <div key={member.id} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-medium">{member.name}</h4>
+                                <span className="text-sm text-gray-500">{member.role === 'manager' ? 'Gerente' : 'Membro'}</span>
+                              </div>
+                              
+                              {memberReports.length > 0 ? (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">Total de registros:</span>
+                                    <span className="text-sm font-medium">{memberReports.length}</span>
+                                  </div>
+                                  
+                                  {mostFrequentEmotion && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-gray-600">Emoção mais frequente:</span>
+                                      <div className="flex items-center gap-1">
+                                        <span>{mostFrequentEmotion.emoji}</span>
+                                        <span className="text-sm font-medium">{mostFrequentEmotion.name}</span>
+                                        <span className="text-xs text-gray-500">({maxCount} vezes)</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {Array.from(emotionCounts.entries()).map(([emotionId, count]) => {
+                                      const emotion = teamData.emotions.find(e => e.id === emotionId);
+                                      if (!emotion) return null;
+                                      
+                                      return (
+                                        <div 
+                                          key={emotionId} 
+                                          className="px-2 py-1 rounded-full text-xs flex items-center gap-1"
+                                          style={{ 
+                                            backgroundColor: `${emotion.color}20`, 
+                                            color: emotion.color 
+                                          }}
+                                        >
+                                          <span>{emotion.emoji}</span>
+                                          <span>{count}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500">Nenhum registro de emoção encontrado.</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
             </Tabs>
           </div>
