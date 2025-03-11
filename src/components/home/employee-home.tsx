@@ -1,6 +1,6 @@
- 
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -8,7 +8,44 @@ import { useEmotionRecordContext } from "@/contexts/emotion-record-context";
 
 export default function EmployeeHome() {
   const router = useRouter();
-  const { emotionRecords, loading, getEmotionDetails } = useEmotionRecordContext();
+  const {
+    emotionRecords,
+    loading,
+    getEmotionDetails,
+    fetchEmotionRecordsForLoggedUser, // Fetch emotion records for the logged user
+  } = useEmotionRecordContext();
+
+  // ✅ Store fetched emotion details in state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [emotionDetailsMap, setEmotionDetailsMap] = useState<Record<number, any>>({});
+
+  // 🚀 Fetch emotion records when the component mounts
+  useEffect(() => {
+    fetchEmotionRecordsForLoggedUser();
+  }, [fetchEmotionRecordsForLoggedUser]);
+
+  // ✅ Fetch emotion details before rendering
+  useEffect(() => {
+    const fetchEmotionDetails = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const newEmotionDetails: Record<number, any> = {};
+
+      for (const entry of emotionRecords) {
+        if (!emotionDetailsMap[entry.emotion_id]) {
+          const emotion = await getEmotionDetails(entry.emotion_id);
+          if (emotion) {
+            newEmotionDetails[entry.emotion_id] = emotion;
+          }
+        }
+      }
+
+      setEmotionDetailsMap((prev) => ({ ...prev, ...newEmotionDetails }));
+    };
+
+    if (emotionRecords.length > 0) {
+      fetchEmotionDetails();
+    }
+  }, [emotionRecords, getEmotionDetails]);
 
   const handleAddEntry = () => {
     router.push("/register-mood");
@@ -55,7 +92,8 @@ export default function EmployeeHome() {
                     </tr>
                   ) : emotionRecords.length > 0 ? (
                     emotionRecords.map((entry, index) => {
-                      const emotion = getEmotionDetails(entry.emotion_id);
+                      const emotion = emotionDetailsMap[entry.emotion_id];
+
                       return (
                         <tr key={index} className="text-center">
                           <td className="border border-gray-300 px-4 py-2">

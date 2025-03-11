@@ -85,13 +85,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
       const token = localStorage.getItem('token');
       const email = newMemberEmail;
       
-      const response = await fetch(`${apiUrl}/teams/${teamId}`, {
+      const response = await fetch(`${apiUrl}/teams/${teamId}?user_email=${email}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ user_email: email, team_id: teamId }),
       });
 
 

@@ -33,6 +33,7 @@ interface EmotionRecordContextProps {
   fetchEmotions: () => Promise<void>;
   fetchEmotionRecords: () => Promise<void>;
   fetchTeamEmotions: () => Promise<void>;
+  fetchEmotionRecordsForLoggedUser: () => Promise<void>; 
   fetchAllEmotions: () => Promise<void>;
   registerEmotion: (
     emotionId: number,
@@ -41,7 +42,7 @@ interface EmotionRecordContextProps {
     isAnonymous: boolean
   ) => Promise<void>;
   updateTeamEmotions: (selectedEmotionIds: number[]) => Promise<boolean>;
-  getEmotionDetails: (emotionId: number) => Emotion | undefined;
+  getEmotionDetails: (emotionId: number) => Promise<Emotion | undefined>;
   createEmotion: (emotion: Omit<Emotion, 'id' | 'team_id'>) => Promise<{ success: boolean; data?: Emotion; error?: string }>;
   createMultipleEmotions: (emotions: Array<Omit<Emotion, 'id' | 'team_id'>>) => Promise<{ success: boolean; createdCount: number; errors: string[] }>;
 }
@@ -49,27 +50,7 @@ interface EmotionRecordContextProps {
 // 🌟 **Mock de Emoções**
 const mockEmotions: Emotion[] = getAllEmotionsWithIds();
 
-// 🌟 **Mock de Registros de Emoção**
-const mockEmotionRecords: EmotionRecord[] = [
-  {
-    user_id: 1,
-    emotion_id: 1,
-    intensity: 4,
-    notes: "Dia super produtivo!",
-    is_anonymous: false,
-    id: 101,
-    created_at: "2025-02-23T10:00:00.000Z",
-  },
-  {
-    user_id: 1,
-    emotion_id: 3,
-    intensity: 2,
-    notes: "Me senti desmotivado pela manhã.",
-    is_anonymous: true,
-    id: 102,
-    created_at: "2025-02-22T14:30:00.000Z",
-  },
-];
+
 
 const EmotionRecordContext = createContext<EmotionRecordContextProps | undefined>(undefined);
 
@@ -78,6 +59,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
   const [teamEmotions, setTeamEmotions] = useState<Emotion[]>([]);
   const [emotionRecords, setEmotionRecords] = useState<EmotionRecord[]>([]);
   const [allEmotions, setAllEmotions] = useState<Emotion[]>([]);
+  const [cachedEmotions, setCachedEmotions] = useState<Emotion[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { user } = useAuthContext();
@@ -90,6 +72,76 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     emotionRecords: 0,
     allEmotions: 0
   });
+
+  const fetchAndCacheEmotions = useCallback(async () => {
+    console.log("🌍 Fetching emotions from API...");
+  
+    try {
+      const response = await fetch(`${API_URL}/emotion`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+  
+      if (!response.ok) {
+        console.error(`❌ Error fetching emotions (Status: ${response.status})`);
+        return;
+      }
+  
+      const data = await response.json();
+      console.log(`✅ Loaded ${data.emotions.length} emotions from API.`);
+      
+      // Save emotions in memory (cache)
+      setCachedEmotions(data.emotions);
+    } catch (error) {
+      console.error("❌ Unexpected error fetching emotions:", error);
+    }
+  }, [API_URL]);
+
+  const fetchEmotionRecordsForLoggedUser = useCallback(async () => {
+    if (!user) {
+      console.warn("fetchEmotionRecordsForLoggedUser - Usuário não autenticado.");
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current.emotionRecords < 500) {
+      console.log("fetchEmotionRecordsForLoggedUser - Chamada ignorada (muito frequente)");
+      return;
+    }
+
+    lastFetchTimeRef.current.emotionRecords = now;
+    setLoading(true);
+    console.log("fetchEmotionRecordsForLoggedUser - Buscando registros de emoção do usuário logado");
+
+    try {
+      const response = await fetch(`${API_URL}/emotion_record/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEmotionRecords(data.emotion_records);
+        console.log(`fetchEmotionRecordsForLoggedUser - ${data.emotion_records.length} registros encontrados`);
+      } else {
+        console.error("Erro ao buscar registros do usuário:", response.status, response.statusText);
+        toast.error("⚠️ Erro ao carregar os registros de emoção.");
+      }
+    } catch (error) {
+      console.error("Erro ao buscar registros do usuário:", error);
+      toast.error("⚠️ Erro inesperado ao carregar os registros.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, API_URL]);
+
+  useEffect(() => {
+    if (user) {
+      fetchEmotionRecordsForLoggedUser();
+    }
+  }, [user, fetchEmotionRecordsForLoggedUser]);
   
   // Memoizar as funções para evitar recriações desnecessárias
   const fetchEmotions = useCallback(async () => {
@@ -142,14 +194,14 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       } else {
         console.error("Erro ao buscar emoções:", response.status, response.statusText);
         setEmotions(mockEmotions);
-        toast.error("⚠️ Erro ao carregar emoções. Exibindo mock.");
       }
     } catch (error) {
       console.error("Erro ao buscar emoções:", error);
       setEmotions(mockEmotions);
-      toast.error("⚠️ Erro inesperado. Exibindo mock.");
     }
   }, [user, API_URL]);
+
+
 
   const fetchEmotionRecords = useCallback(async () => {
     // Evitar chamadas duplicadas em um curto período de tempo (500ms)
@@ -176,8 +228,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
           console.log("fetchEmotionRecords - Team ID obtido da URL:", teamId);
         } else {
           console.log("fetchEmotionRecords - Não foi possível determinar o ID do time");
-          setEmotionRecords(mockEmotionRecords);
-          toast.info("📚 Exibindo registros de exemplo.");
+          toast.info("📚 Nenhum registro encontrado.");
           return;
         }
       }
@@ -187,16 +238,14 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       });
       if (response.ok) {
         const data = await response.json();
-        setEmotionRecords(data.emotion_records.length ? data.emotion_records : mockEmotionRecords);
-        if (data.emotion_records.length === 0) toast.info("📚 Exibindo registros de exemplo.");
+        setEmotionRecords(data.emotion_records );
+        if (data.emotion_records.length === 0) toast.info("📚 Nenhum registro encontrado.");
       } else {
-        setEmotionRecords(mockEmotionRecords);
-        toast.error("⚠️ Erro ao carregar o histórico. Exibindo mock.");
+      
       }
     } catch (error) {
       console.error("Erro ao buscar histórico:", error);
-      setEmotionRecords(mockEmotionRecords);
-      toast.error("⚠️ Erro inesperado ao carregar histórico.");
+     
     } finally {
       setLoading(false);
     }
@@ -227,7 +276,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
           console.log("fetchTeamEmotions - Team ID obtido da URL:", teamId);
         } else {
           console.log("fetchTeamEmotions - Não foi possível determinar o ID do time");
-          setTeamEmotions(mockEmotions);
+  
           toast.info("⚡ Exibindo emoções do time (mock).");
           return;
         }
@@ -247,18 +296,16 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
           setTeamEmotions(data.emotions);
         } else {
           console.log("Nenhuma emoção encontrada para este time, usando mock");
-          setTeamEmotions(mockEmotions);
+         
           toast.info("⚡ Exibindo emoções do time (mock).");
         }
       } else {
         console.error("Erro ao buscar emoções:", response.status, response.statusText);
-        setTeamEmotions(mockEmotions);
-        toast.error("⚠️ Erro ao carregar as emoções do time. Exibindo mock.");
+       
       }
     } catch (error) {
       console.error("Erro ao buscar emoções do time:", error);
-      setTeamEmotions(mockEmotions);
-      toast.error("⚠️ Erro inesperado ao carregar emoções do time.");
+     
     }
   }, [user, API_URL]);
 
@@ -291,12 +338,10 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
         // Usar o mock de emoções em caso de erro
         setAllEmotions(mockEmotions);
         toast.info("⚡ Exibindo emoções de exemplo.");
-        toast.error("⚠️ Erro ao carregar todas as emoções disponíveis.");
       }
     } catch (error) {
       console.error("Erro ao buscar todas as emoções:", error);
       setAllEmotions(mockEmotions);
-      toast.error("⚠️ Erro inesperado ao carregar emoções.");
     }
   }, [API_URL]);
 
@@ -402,7 +447,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
 
     // Exibir erros, se houver
     if (errors.length > 0) {
-      toast.error(`⚠️ ${errors.length} emoções não puderam ser criadas.`);
     }
 
     return {
@@ -420,7 +464,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     // Verificar se o array de IDs está vazio ou não é um array
     if (!Array.isArray(selectedEmotionIds)) {
       console.error("updateTeamEmotions - selectedEmotionIds não é um array");
-      toast.error("⚠️ Erro: formato inválido de emoções selecionadas.");
       return false;
     }
     
@@ -429,7 +472,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       console.log("updateTeamEmotions - Usuário não é gerente:", {
         "user?.role": user?.role
       });
-      toast.error("⚠️ Apenas gerentes podem atualizar as emoções do time.");
       return false;
     }
     
@@ -446,7 +488,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
         console.log("updateTeamEmotions - Team ID obtido da URL:", teamId);
       } else {
         console.error("updateTeamEmotions - Não foi possível determinar o ID do time");
-        toast.error("⚠️ Não foi possível determinar o ID do time.");
         return false;
       }
     }
@@ -456,7 +497,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     // Verificar se foram selecionadas exatamente 6 emoções
     if (selectedEmotionIds.length !== 6) {
       console.log("updateTeamEmotions - Número incorreto de emoções:", selectedEmotionIds.length);
-      toast.error("⚠️ Você precisa selecionar exatamente 6 emoções para o time.");
       return false;
     }
 
@@ -533,16 +573,13 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       // Se chegou aqui, algo deu errado
       if (errors.length > 0) {
         console.error(`${errors.length} erros ao atualizar emoções:`, errors);
-        toast.error(`⚠️ ${errors.length} erros ao atualizar emoções.`);
       } else {
-        toast.error("⚠️ Nenhuma emoção foi atualizada.");
       }
       
       return false;
     } catch (error) {
       console.error("Erro ao atualizar emoções do time:", error);
       toast.dismiss("emotions-loading");
-      toast.error("⚠️ Erro inesperado ao atualizar emoções do time.");
       return false;
     }
   }, [user, API_URL, fetchTeamEmotions, allEmotions]);
@@ -556,7 +593,6 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     console.log("Iniciando registro de emoção:", { emotionId, intensity, isAnonymous });
     
     if (!user) {
-      toast.error("❌ Você precisa estar logado para registrar uma emoção.");
       return;
     }
     
@@ -595,13 +631,53 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       setEmotionRecords((prev) => [newRecord, ...prev]);
     } catch (error) {
       console.error("Erro ao registrar emoção:", error);
-      toast.error("❌ Erro ao registrar emoção.");
       throw error; // Propagar o erro para que o componente possa tratá-lo
     }
   }, [user, API_URL, setEmotionRecords]);
 
-  const getEmotionDetails = useCallback((emotionId: number) =>
-    emotions.find((emotion) => emotion.id === emotionId), [emotions]);
+  const getEmotionDetails = useCallback(
+    async (emotionId: number) => {
+      console.log(`🔍 Searching for emotion with ID: ${emotionId}`);
+  
+      if (!emotionId) {
+        console.warn("⚠️ getEmotionDetails - Invalid emotion ID.");
+        return undefined;
+      }
+  
+      // First, check in the cached emotions
+      if (cachedEmotions.length > 0) {
+        const cachedEmotion = cachedEmotions.find((emotion) => emotion.id === emotionId);
+        if (cachedEmotion) {
+          console.log(`✅ Found in cache: ${cachedEmotion.emoji} ${cachedEmotion.name} (ID: ${cachedEmotion.id})`);
+          return cachedEmotion;
+        }
+      } else {
+        console.warn("⚠️ getEmotionDetails - Emotion cache is empty.");
+      }
+  
+      // If not found in cache, fetch and update cache
+      console.log("🔄 Emotion not found in cache, fetching from API...");
+      await fetchAndCacheEmotions();
+  
+      // Search again in updated cache
+      const updatedEmotion = cachedEmotions.find((emotion) => emotion.id === emotionId);
+      if (updatedEmotion) {
+        console.log(`✅ Found after API fetch: ${updatedEmotion.emoji} ${updatedEmotion.name} (ID: ${updatedEmotion.id})`);
+        return updatedEmotion;
+      } else {
+        console.error(`❌ Emotion not found after API fetch (ID: ${emotionId})`);
+      }
+  
+      return undefined;
+    },
+    [cachedEmotions, fetchAndCacheEmotions]
+  );
+  
+  // 📌 Load emotions into cache on first render
+  useEffect(() => {
+    fetchAndCacheEmotions();
+  }, [fetchAndCacheEmotions]);
+  
 
   // Função para criar uma nova emoção
   const createEmotion = useCallback(async (emotion: Omit<Emotion, 'id' | 'team_id'>): Promise<{ success: boolean; data?: Emotion; error?: string }> => {
@@ -651,39 +727,40 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     }
   }, [user, API_URL]);
 
-  // Memoizar o valor do contexto para evitar renderizações desnecessárias
-  const contextValue = useMemo(() => ({
-    emotions,
-    emotionRecords,
-    teamEmotions,
-    allEmotions,
-    loading,
-    fetchEmotions,
-    fetchEmotionRecords,
-    fetchTeamEmotions,
-    fetchAllEmotions,
-    registerEmotion,
-    updateTeamEmotions,
-    getEmotionDetails,
-    createEmotion,
-    createMultipleEmotions
-  }), [
-    emotions,
-    emotionRecords,
-    teamEmotions,
-    allEmotions,
-    loading,
-    fetchEmotions,
-    fetchEmotionRecords,
-    fetchTeamEmotions,
-    fetchAllEmotions,
-    registerEmotion,
-    updateTeamEmotions,
-    getEmotionDetails,
-    createEmotion,
-    createMultipleEmotions
-  ]);
-
+ // 🚀 Criando o objeto de contexto
+ const contextValue = useMemo(() => ({
+  emotions,
+  emotionRecords,
+  teamEmotions,
+  allEmotions,
+  loading,
+  fetchEmotions,
+  fetchEmotionRecordsForLoggedUser,
+  fetchTeamEmotions,
+  fetchEmotionRecords,
+  fetchAllEmotions,
+  registerEmotion,
+  updateTeamEmotions,
+  getEmotionDetails,
+  createEmotion,
+  createMultipleEmotions
+}), [
+  emotions,
+  emotionRecords,
+  teamEmotions,
+  allEmotions,
+  loading,
+  fetchEmotionRecords,
+  fetchEmotions,
+  fetchEmotionRecordsForLoggedUser,
+  fetchTeamEmotions,
+  fetchAllEmotions,
+  registerEmotion,
+  updateTeamEmotions,
+  getEmotionDetails,
+  createEmotion,
+  createMultipleEmotions
+]);
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -707,7 +784,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     };
     
     loadData();
-  }, [user, fetchEmotions, fetchTeamEmotions, fetchEmotionRecords, fetchAllEmotions]);
+  }, [user, fetchEmotions, fetchTeamEmotions, fetchEmotionRecords, fetchAllEmotions, fetchEmotionRecordsForLoggedUser]);
 
   return (
     <EmotionRecordContext.Provider value={contextValue}>
