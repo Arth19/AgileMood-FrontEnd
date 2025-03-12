@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Desativa os alertas de erro na tela
+  onDemandEntries: {
+    // Período em ms em que a página será mantida em buffer
+    maxInactiveAge: 25 * 1000,
+    // Número de páginas que serão mantidas em buffer
+    pagesBufferLength: 2,
+  },
+  // Desativa os erros de hidratação React
+  reactStrictMode: false,
 };
 
 export default nextConfig;

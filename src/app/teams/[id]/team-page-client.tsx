@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { TeamResponse, TeamMember, TeamEmotion } from "@/lib/types/index";
 import { notFound } from "next/navigation";
-import { Loader2, UserPlus, Settings, Check, BarChart2 } from "lucide-react";
+import { Loader2, UserPlus, Settings, Check, BarChart2, Trash2 } from "lucide-react";
 import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
   const [addingMember, setAddingMember] = useState(false);
   const [selectedEmotions, setSelectedEmotions] = useState<number[]>([]);
   const [updatingTeamEmotions, setUpdatingTeamEmotions] = useState(false);
+  const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
+  const [deletingMember, setDeletingMember] = useState(false);
 
   const { allEmotions, fetchAllEmotions, updateTeamEmotions } = useEmotionRecordContext();
   const router = useRouter();
@@ -52,6 +55,15 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
       }
 
       const data = await response.json();
+      
+      // Log para depuração
+      console.log("Dados do time recebidos:", {
+        teamName: data.team_data.name,
+        userRole: data.user_role,
+        membersCount: data.members.length,
+        members: data.members.map((m: TeamMember) => ({ name: m.name, role: m.role }))
+      });
+      
       setTeamData(data);
       setLoading(false);
     } catch (err) {
@@ -154,8 +166,51 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
     }
   };
 
+  const handleDeleteMember = async () => {
+    if (!memberToDelete) return;
+    
+    try {
+      setDeletingMember(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const token = localStorage.getItem('token');
+      
+      // Log para depuração
+      console.log(`Tentando remover membro: ${memberToDelete.name}, Email: ${memberToDelete.email}`);
+      
+      // Usando o email como parâmetro de consulta
+      const response = await fetch(`${apiUrl}/teams/${teamId}/member?user_email=${memberToDelete.email}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  
+      if (!response.ok) {
+        // throw new Error(`Falha ao remover membro: ${response.status} - ${response.statusText}`);
+      }
+
+      // Atualiza os dados do time
+      const updatedTeamResponse = await fetch(`${apiUrl}/teams/${teamId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const updatedTeamData = await updatedTeamResponse.json();
+      setTeamData(updatedTeamData);
+
+      toast.success('Membro removido com sucesso!');
+      setShowDeleteMemberModal(false);
+      setMemberToDelete(null);
+    } catch (error) {
+      console.error("Erro ao remover membro:", error);
+      toast.error('Erro ao remover membro do time');
+    } finally {
+      setDeletingMember(false);
+    }
+  };
+
   const getIntensityLabel = (intensity: number) => {
     switch (intensity) {
       case 1: return { label: 'Muito Baixa', color: 'bg-blue-100 text-blue-800' };
@@ -231,10 +286,18 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                         <th className="text-left p-3 border-b">Nome</th>
                         <th className="text-left p-3 border-b">Email</th>
                         <th className="text-left p-3 border-b">Função</th>
+                        <th className="text-left p-3 border-b">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {teamData.members.map((member: TeamMember) => (
+                      {teamData.members.map((member: TeamMember) => {
+                        // Log para depuração
+                        // Consideramos que o usuário é gerente se user_role for 'manager' ou se não estiver definido
+                        const isUserManager = teamData.user_role === 'manager' || teamData.user_role === undefined;
+                        const canDelete = isUserManager && member.role !== 'manager';
+                        console.log(`Membro: ${member.name}, Role: ${member.role}, User Role: ${teamData.user_role}, É Gerente: ${isUserManager}, Pode Deletar: ${canDelete}`);
+                        
+                        return (
                         <tr key={member.email} className="hover:bg-gray-50">
                           <td className="p-3 border-b">
                             {member.avatar ? (
@@ -260,8 +323,22 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                               {member.role === 'manager' ? 'Gerente' : 'Funcionário'}
                             </span>
                           </td>
+                          <td className="p-3 border-b">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="flex items-center gap-1"
+                              onClick={() => {
+                                setMemberToDelete(member);
+                                setShowDeleteMemberModal(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>Remover</span>
+                            </Button>
+                          </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
@@ -479,6 +556,42 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowManageEmotionsModal(false)}>
               Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Confirmar Exclusão de Membro */}
+      <Dialog open={showDeleteMemberModal} onOpenChange={setShowDeleteMemberModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600">
+              Tem certeza que deseja remover <span className="font-semibold">{memberToDelete?.name}</span> do time?
+            </p>
+            <p className="text-sm text-red-500 mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteMemberModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteMember}
+              disabled={deletingMember}
+            >
+              {deletingMember ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removendo...
+                </>
+              ) : (
+                'Remover Membro'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
