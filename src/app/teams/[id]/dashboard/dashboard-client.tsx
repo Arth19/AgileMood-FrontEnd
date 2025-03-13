@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "sonner";
 import { useRouter } from "next/navigation";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { Sprint, SprintSelector } from "@/components/ui/sprint-selector";
+import { EmotionBarChart, EmotionPieChart, EmotionChartData } from "@/components/charts/emotion-charts";
+import { FeedbackMessage } from "@/components/feedback/feedback-message";
 
 // Interfaces para os tipos do time
 interface TeamMember {
@@ -107,19 +115,73 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
   const [userEmotionAnalysis, setUserEmotionAnalysis] = useState<UserEmotionAnalysisResponse | null>(null);
   const [anonymousRecords, setAnonymousRecords] = useState<AnonymousRecordsResponse | null>(null);
   const [teamData, setTeamData] = useState<TeamResponse | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [filteredReports, setFilteredReports] = useState<EmotionReport[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null);
   
   const router = useRouter();
 
-  // Função para processar os dados do time e gerar estatísticas
-  const processTeamData = useCallback((data: TeamResponse) => {
+  // Função para gerar sprints fictícias para demonstração
+  const generateDemoSprints = useCallback(() => {
+    const demoSprints: Sprint[] = [];
+    const today = new Date();
+    
+    // Gerar 6 sprints anteriores de 2 semanas cada
+    for (let i = 0; i < 6; i++) {
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() - (i * 14));
+      
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - 13);
+      
+      demoSprints.push({
+        id: `sprint-${i+1}`,
+        name: `Sprint ${i+1}`,
+        startDate,
+        endDate
+      });
+    }
+    
+    setSprints(demoSprints);
+  }, []);
+
+  // Efeito para gerar sprints de demonstração
+  useEffect(() => {
+    generateDemoSprints();
+  }, [generateDemoSprints]);
+
+  // Função para processar os dados do time e gerar estatísticas com base no período selecionado
+  const processTeamData = useCallback((data: TeamResponse, range: DateRange | undefined = undefined) => {
     if (!data || !data.emotions_reports || !data.emotions) return;
+
+    // Filtrar relatórios pelo período selecionado
+    let filteredEmotionReports = [...data.emotions_reports];
+    
+    if (range?.from) {
+      filteredEmotionReports = filteredEmotionReports.filter(report => 
+        new Date(report.created_at) >= range.from!
+      );
+    }
+    
+    if (range?.to) {
+      // Ajustar a data final para incluir todo o dia
+      const adjustedEnd = new Date(range.to);
+      adjustedEnd.setHours(23, 59, 59, 999);
+      
+      filteredEmotionReports = filteredEmotionReports.filter(report => 
+        new Date(report.created_at) <= adjustedEnd
+      );
+    }
+    
+    setFilteredReports(filteredEmotionReports);
 
     // Processamento para distribuição de emojis
     const emotionCounts = new Map<number, number>();
     let negativeCount = 0;
     let totalCount = 0;
 
-    data.emotions_reports.forEach(report => {
+    filteredEmotionReports.forEach(report => {
       const emotionId = report.emotion_id;
       emotionCounts.set(emotionId, (emotionCounts.get(emotionId) || 0) + 1);
       
@@ -159,7 +221,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     // Processamento para intensidade média
     const emotionIntensities = new Map<number, number[]>();
     
-    data.emotions_reports.forEach(report => {
+    filteredEmotionReports.forEach(report => {
       const emotionId = report.emotion_id;
       const intensities = emotionIntensities.get(emotionId) || [];
       intensities.push(report.intensity);
@@ -188,7 +250,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     });
 
     // Processamento para registros anônimos
-    const anonymousReports = data.emotions_reports.filter(report => report.is_anonymous);
+    const anonymousReports = filteredEmotionReports.filter(report => report.is_anonymous);
     const anonymousEmotionCounts = new Map<number, number>();
     const anonymousEmotionIntensities = new Map<number, number[]>();
 
@@ -337,6 +399,20 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     };
   }, [teamData]);
 
+  // Função para lidar com a mudança de sprint
+  const handleSprintChange = useCallback((sprint: Sprint | null) => {
+    setSelectedSprint(sprint);
+    
+    if (sprint) {
+      setDateRange({
+        from: sprint.startDate,
+        to: sprint.endDate
+      });
+    } else {
+      setDateRange(undefined);
+    }
+  }, []);
+
   // Buscar dados do time
   const fetchTeamData = useCallback(async () => {
     try {
@@ -408,6 +484,82 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     }
   }, [selectedMemberId, teamData, generateUserEmotionAnalysis, loading]);
 
+  // Efeito para reprocessar os dados quando as datas de filtro mudam
+  useEffect(() => {
+    if (teamData) {
+      processTeamData(teamData, dateRange);
+    }
+  }, [dateRange, teamData, processTeamData]);
+
+  // Função para exportar relatórios em CSV
+  const exportReportsCSV = useCallback(() => {
+    if (!teamData || !filteredReports.length) {
+      toast.error("Não há dados para exportar");
+      return;
+    }
+
+    // Criar cabeçalho do CSV
+    let csvContent = "ID,Usuário,Emoção,Intensidade,Anônimo,Notas,Data de Criação\n";
+
+    // Adicionar linhas de dados
+    filteredReports.forEach(report => {
+      const emotion = teamData.emotions.find(e => e.id === report.emotion_id);
+      const userName = report.is_anonymous 
+        ? 'Anônimo' 
+        : report.user_name || teamData.members.find(m => m.id === report.user_id)?.name || 'Usuário';
+      
+      // Formatar data
+      const createdAt = new Date(report.created_at).toLocaleString('pt-BR');
+      
+      // Escapar notas para evitar problemas com vírgulas no CSV
+      const escapedNotes = report.notes ? `"${report.notes.replace(/"/g, '""')}"` : "";
+      
+      csvContent += `${report.id},${userName},${emotion?.name || ''},${report.intensity},${report.is_anonymous},${escapedNotes},${createdAt}\n`;
+    });
+
+    // Criar blob e link para download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    // Definir nome do arquivo com período, se aplicável
+    let fileName = `relatorio-emocoes-time-${teamId}`;
+    if (selectedSprint) {
+      fileName += `-sprint-${selectedSprint.name.replace(/\s+/g, '-')}`;
+    } else if (dateRange?.from && dateRange?.to) {
+      fileName += `-${format(dateRange.from, 'dd-MM-yyyy')}_a_${format(dateRange.to, 'dd-MM-yyyy')}`;
+    }
+    fileName += '.csv';
+    
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Relatório exportado com sucesso!");
+  }, [teamData, filteredReports, teamId, dateRange, selectedSprint]);
+
+  // Função para converter dados de emoções para o formato dos gráficos
+  const convertToChartData = useCallback((data: EmojiDistribution[] | AverageIntensity[]): EmotionChartData[] => {
+    if (!teamData) return [];
+    
+    return data.map(item => {
+      const emotionName = item.emotion_name.split(' ');
+      // Extrair o nome sem o emoji
+      const name = emotionName.slice(1).join(' ');
+      
+      // Encontrar a cor da emoção
+      const emotion = teamData.emotions.find(e => e.name === name);
+      
+      return {
+        name: item.emotion_name,
+        value: 'frequency' in item ? item.frequency : item.avg_intensity,
+        color: emotion?.color || '#' + Math.floor(Math.random()*16777215).toString(16)
+      };
+    });
+  }, [teamData]);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -450,6 +602,70 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                 </Button>
               </div>
             </div>
+
+            {/* Filtro por período */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Filtrar por Período</CardTitle>
+                <CardDescription>
+                  Selecione um período ou sprint para filtrar os relatórios de emoções
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Selecionar Sprint</label>
+                    <SprintSelector 
+                      sprints={sprints}
+                      selectedSprint={selectedSprint}
+                      onSprintChange={handleSprintChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Ou Selecionar Período Personalizado</label>
+                    <DateRangePicker 
+                      dateRange={dateRange} 
+                      onDateRangeChange={(range) => {
+                        setDateRange(range);
+                        if (range) setSelectedSprint(null);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    {(dateRange?.from || selectedSprint) && (
+                      <div className="p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
+                        {filteredReports.length} registros encontrados no período selecionado
+                        {selectedSprint && ` (Sprint ${selectedSprint.name})`}
+                        {!selectedSprint && dateRange?.from && dateRange?.to && 
+                          ` (${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} a ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })})`
+                        }
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setDateRange(undefined);
+                        setSelectedSprint(null);
+                      }}
+                    >
+                      Limpar Filtros
+                    </Button>
+                    <Button 
+                      onClick={exportReportsCSV}
+                      className="flex items-center gap-2"
+                      disabled={!filteredReports.length}
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar CSV
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <Tabs defaultValue="overview" className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
@@ -521,12 +737,35 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                           Nenhum registro de emoção encontrado para este período.
                         </p>
                       ) : (
-                        <div className="space-y-4">
-                          {emojiDistribution?.emoji_distribution.map((item) => (
-                            <div key={item.emotion_name} className="flex items-center justify-between">
-                              <span>{item.emotion_name}</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-40 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="space-y-6">
+                          {/* Gráfico de barras */}
+                          <div className="mb-8">
+                            <EmotionBarChart 
+                              data={emojiDistribution ? convertToChartData(emojiDistribution.emoji_distribution) : []}
+                              title="Frequência de Emoções"
+                              height={300}
+                            />
+                          </div>
+                          
+                          {/* Gráfico de pizza */}
+                          <div className="mb-8">
+                            <EmotionPieChart 
+                              data={emojiDistribution ? convertToChartData(emojiDistribution.emoji_distribution) : []}
+                              title="Distribuição Percentual de Emoções"
+                              height={350}
+                            />
+                          </div>
+                          
+                          {/* Barras de progresso existentes */}
+                          <div className="mt-8 pt-6 border-t">
+                            <h3 className="font-medium mb-4">Detalhamento por Emoção</h3>
+                            {emojiDistribution?.emoji_distribution.map((item) => (
+                              <div key={item.emotion_name} className="space-y-2 mb-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">{item.emotion_name}</span>
+                                  <span className="text-sm font-medium">{item.frequency} registros</span>
+                                </div>
+                                <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-blue-500 rounded-full"
                                     style={{
@@ -543,10 +782,27 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                                     }}
                                   />
                                 </div>
-                                <span className="text-sm font-medium">{item.frequency}</span>
                               </div>
+                            ))}
+                          </div>
+
+                          {/* Proporção de emoções negativas */}
+                          <div className="mt-8 pt-6 border-t">
+                            <h3 className="font-medium mb-2">Proporção de Emoções Negativas</h3>
+                            <div className="flex items-center gap-4">
+                              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-red-500 rounded-full"
+                                  style={{
+                                    width: `${emojiDistribution?.negative_emotion_ratio ? emojiDistribution.negative_emotion_ratio * 100 : 0}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium">
+                                {emojiDistribution?.negative_emotion_ratio ? (emojiDistribution.negative_emotion_ratio * 100).toFixed(1) : 0}%
+                              </span>
                             </div>
-                          ))}
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -708,31 +964,53 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                       </p>
                     ) : (
                       <div className="space-y-6">
-                        {emojiDistribution?.emoji_distribution.map((item) => (
-                          <div key={item.emotion_name} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{item.emotion_name}</span>
-                              <span className="text-sm font-medium">{item.frequency} registros</span>
+                        {/* Gráfico de barras */}
+                        <div className="mb-8">
+                          <EmotionBarChart 
+                            data={emojiDistribution ? convertToChartData(emojiDistribution.emoji_distribution) : []}
+                            title="Frequência de Emoções"
+                            height={300}
+                          />
+                        </div>
+                        
+                        {/* Gráfico de pizza */}
+                        <div className="mb-8">
+                          <EmotionPieChart 
+                            data={emojiDistribution ? convertToChartData(emojiDistribution.emoji_distribution) : []}
+                            title="Distribuição Percentual de Emoções"
+                            height={350}
+                          />
+                        </div>
+                        
+                        {/* Barras de progresso existentes */}
+                        <div className="mt-8 pt-6 border-t">
+                          <h3 className="font-medium mb-4">Detalhamento por Emoção</h3>
+                          {emojiDistribution?.emoji_distribution.map((item) => (
+                            <div key={item.emotion_name} className="space-y-2 mb-4">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{item.emotion_name}</span>
+                                <span className="text-sm font-medium">{item.frequency} registros</span>
+                              </div>
+                              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min(
+                                      (item.frequency /
+                                        Math.max(
+                                          ...emojiDistribution.emoji_distribution.map(
+                                            (i) => i.frequency
+                                          )
+                                        )) *
+                                        100,
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
                             </div>
-                            <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 rounded-full"
-                                style={{
-                                  width: `${Math.min(
-                                    (item.frequency /
-                                      Math.max(
-                                        ...emojiDistribution.emoji_distribution.map(
-                                          (i) => i.frequency
-                                        )
-                                      )) *
-                                      100,
-                                    100
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
 
                         {/* Proporção de emoções negativas */}
                         <div className="mt-8 pt-6 border-t">
@@ -773,24 +1051,37 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                       </p>
                     ) : (
                       <div className="space-y-6">
-                        {averageIntensity?.average_intensity.map((item) => (
-                          <div key={item.emotion_name} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{item.emotion_name}</span>
-                              <span className="text-sm font-medium">
-                                {item.avg_intensity.toFixed(1)} / 5
-                              </span>
+                        {/* Gráfico de barras */}
+                        <div className="mb-8">
+                          <EmotionBarChart 
+                            data={averageIntensity ? convertToChartData(averageIntensity.average_intensity) : []}
+                            title="Intensidade Média por Emoção"
+                            height={300}
+                          />
+                        </div>
+                        
+                        {/* Barras de progresso existentes */}
+                        <div className="mt-8 pt-6 border-t">
+                          <h3 className="font-medium mb-4">Detalhamento por Emoção</h3>
+                          {averageIntensity?.average_intensity.map((item) => (
+                            <div key={item.emotion_name} className="space-y-2 mb-4">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{item.emotion_name}</span>
+                                <span className="text-sm font-medium">
+                                  {item.avg_intensity.toFixed(1)} / 5
+                                </span>
+                              </div>
+                              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-orange-500 rounded-full"
+                                  style={{
+                                    width: `${(item.avg_intensity / 5) * 100}%`,
+                                  }}
+                                />
+                              </div>
                             </div>
-                            <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-orange-500 rounded-full"
-                                style={{
-                                  width: `${(item.avg_intensity / 5) * 100}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -822,9 +1113,20 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
 
                       {selectedMemberId && userEmotionAnalysis ? (
                         <div className="mt-6">
-                          <h3 className="text-lg font-medium mb-4">
-                            Análise de {userEmotionAnalysis.user_name}
-                          </h3>
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-medium">
+                              Análise de {userEmotionAnalysis.user_name}
+                            </h3>
+                            
+                            {/* Botão de Feedback - apenas para gerentes */}
+                            {teamData?.user_role === 'manager' && (
+                              <FeedbackMessage 
+                                teamId={teamId}
+                                memberId={selectedMemberId}
+                                memberName={userEmotionAnalysis.user_name}
+                              />
+                            )}
+                          </div>
                           
                           {userEmotionAnalysis.all_user_emotion_records.length === 0 ? (
                             <p className="text-center py-8 text-gray-500">
@@ -834,7 +1136,19 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                             <div className="space-y-6">
                               {userEmotionAnalysis.all_user_emotion_records.map((item) => (
                                 <div key={item.emotion_name} className="space-y-4">
-                                  <h4 className="font-medium">{item.emotion_name}</h4>
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="font-medium">{item.emotion_name}</h4>
+                                    
+                                    {/* Botão de Feedback específico para emoção - apenas para gerentes */}
+                                    {teamData?.user_role === 'manager' && (
+                                      <FeedbackMessage 
+                                        teamId={teamId}
+                                        memberId={selectedMemberId}
+                                        memberName={userEmotionAnalysis.user_name}
+                                        emotionName={item.emotion_name}
+                                      />
+                                    )}
+                                  </div>
                                   
                                   <div className="space-y-2">
                                     <div className="flex items-center justify-between">
@@ -930,7 +1244,18 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                             <div key={member.id} className="p-4 border rounded-lg">
                               <div className="flex justify-between items-center mb-3">
                                 <h4 className="font-medium">{member.name}</h4>
-                                <span className="text-sm text-gray-500">{member.role === 'manager' ? 'Gerente' : 'Membro'}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-gray-500">{member.role === 'manager' ? 'Gerente' : 'Membro'}</span>
+                                  
+                                  {/* Botão de Feedback - apenas para gerentes */}
+                                  {teamData.user_role === 'manager' && member.role !== 'manager' && (
+                                    <FeedbackMessage 
+                                      teamId={teamId}
+                                      memberId={member.id}
+                                      memberName={member.name}
+                                    />
+                                  )}
+                                </div>
                               </div>
                               
                               {memberReports.length > 0 ? (
@@ -941,13 +1266,26 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                                   </div>
                                   
                                   {mostFrequentEmotion && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm text-gray-600">Emoção mais frequente:</span>
-                                      <div className="flex items-center gap-1">
-                                        <span>{mostFrequentEmotion.emoji}</span>
-                                        <span className="text-sm font-medium">{mostFrequentEmotion.name}</span>
-                                        <span className="text-xs text-gray-500">({maxCount} vezes)</span>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-600">Emoção mais frequente:</span>
+                                        <div className="flex items-center gap-1">
+                                          <span>{mostFrequentEmotion.emoji}</span>
+                                          <span className="text-sm font-medium">{mostFrequentEmotion.name}</span>
+                                          <span className="text-xs text-gray-500">({maxCount} vezes)</span>
+                                        </div>
                                       </div>
+                                      
+                                      {/* Botão de Feedback específico para emoção - apenas para gerentes */}
+                                      {teamData.user_role === 'manager' && member.role !== 'manager' && (
+                                        <FeedbackMessage 
+                                          teamId={teamId}
+                                          memberId={member.id}
+                                          memberName={member.name}
+                                          emotionId={mostFrequentEmotion.id}
+                                          emotionName={`${mostFrequentEmotion.emoji} ${mostFrequentEmotion.name}`}
+                                        />
+                                      )}
                                     </div>
                                   )}
                                   
