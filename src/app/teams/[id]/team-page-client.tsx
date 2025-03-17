@@ -360,6 +360,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                           <th className="text-left p-3 border-b">Intensidade</th>
                           <th className="text-left p-3 border-b">Usuário</th>
                           <th className="text-left p-3 border-b">Observações</th>
+                          <th className="text-left p-3 border-b">Data</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -390,7 +391,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 </span>
                               </td>
                               <td className="p-3 border-b">
-                                {report.user_name === null ? (
+                                {report.is_anonymous ? (
                                   <span className="text-gray-500">Anônimo</span>
                                 ) : report.user_name ? (
                                   <span>{report.user_name.charAt(0).toUpperCase() + report.user_name.slice(1)}</span>
@@ -400,6 +401,13 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                               </td>
                               <td className="p-3 border-b">
                                 {report.notes || <span className="text-gray-400">Sem observações</span>}
+                              </td>
+                              <td className="p-3 border-b">
+                                {report.created_at ? (
+                                  <span>{new Date(report.created_at).toLocaleString('pt-BR')}</span>
+                                ) : (
+                                  <span className="text-gray-400">Data não disponível</span>
+                                )}
                               </td>
                             </tr>
                           );
