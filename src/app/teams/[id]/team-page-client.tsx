@@ -34,6 +34,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
   const [feedbackText, setFeedbackText] = useState("");
   const [currentReport, setCurrentReport] = useState<EmotionReport | null>(null);
   const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [isAnonymousFeedback, setIsAnonymousFeedback] = useState(false);
 
   const { allEmotions, fetchAllEmotions, updateTeamEmotions } = useEmotionRecordContext();
   const router = useRouter();
@@ -226,6 +227,107 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
     }
   };
 
+  const handleSendFeedback = async () => {
+    if (!currentReport || !feedbackText.trim()) return;
+    
+    try {
+      setSendingFeedback(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) {
+        throw new Error('URL da API não configurada');
+      }
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Usuário não autenticado');
+      }
+      
+      // Log para depuração - verificar a estrutura do objeto currentReport
+      console.log("Dados do registro de emoção:", currentReport);
+      console.log("ID do registro de emoção:", currentReport.id);
+      console.log("Tipo do ID:", typeof currentReport.id);
+      
+      // Verificar se o ID existe
+      if (currentReport.id === undefined || currentReport.id === null) {
+        throw new Error('ID do registro de emoção não encontrado');
+      }
+      
+      // Garantir que o ID seja um número
+      const recordId = parseInt(String(currentReport.id), 10);
+      if (isNaN(recordId)) {
+        throw new Error('ID do registro de emoção inválido');
+      }
+      
+      // Criar o corpo da requisição exatamente conforme esperado pela API
+      const requestBody = {
+        message: feedbackText.trim(),
+        emotion_record_id: recordId,
+        is_anonymous: isAnonymousFeedback
+      };
+      
+      // Log do corpo da requisição
+      console.log("Corpo da requisição:", JSON.stringify(requestBody));
+      
+      const response = await fetch(`${apiUrl}/feedback/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      // Log da resposta
+      console.log("Status da resposta:", response.status);
+      const responseText = await response.text();
+      console.log("Resposta completa:", responseText);
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          errorData = { detail: responseText || 'Erro desconhecido' };
+        }
+        console.error("Erro detalhado da API:", errorData);
+        
+        // Verificar se o erro é de permissão
+        if (response.status === 403) {
+          throw new Error('Apenas gerentes podem enviar feedback');
+        }
+        
+        throw new Error(
+          Array.isArray(errorData.detail) 
+            ? errorData.detail.map((err: any) => `${err.loc.join('.')}: ${err.msg}`).join(', ') 
+            : errorData.detail || 'Falha ao enviar feedback'
+        );
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("Resposta não é um JSON válido:", responseText);
+        data = { message: "Feedback enviado com sucesso" };
+      }
+      
+      console.log("Feedback enviado com sucesso:", data);
+      
+      toast.success("Feedback enviado com sucesso!");
+      setShowFeedbackModal(false);
+      setFeedbackText('');
+      setIsAnonymousFeedback(false);
+      
+      // Atualizar os dados do time para mostrar o feedback
+      fetchTeamData();
+    } catch (error) {
+      console.error("Erro ao enviar feedback:", error);
+      toast.error(`Erro ao enviar feedback: ${error instanceof Error ? error.message : 'Tente novamente'}`);
+    } finally {
+      setSendingFeedback(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -415,19 +517,23 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 )}
                               </td>
                               <td className="p-3 border-b">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="flex items-center gap-1 text-xs"
-                                  onClick={() => {
-                                    setCurrentReport(report);
-                                    setFeedbackText("");
-                                    setShowFeedbackModal(true);
-                                  }}
-                                >
-                                  <MessageSquare className="h-3 w-3" />
-                                  Enviar Feedback
-                                </Button>
+                                 
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="flex items-center gap-1 text-xs"
+                                    onClick={() => {
+                                      console.log("Relatório selecionado para feedback:", report);
+                                      setCurrentReport(report);
+                                      setFeedbackText("");
+                                      setIsAnonymousFeedback(false);
+                                      setShowFeedbackModal(true);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-3 w-3" />
+                                    Enviar Feedback
+                                  </Button>
+                                
                               </td>
                             </tr>
                           );
@@ -653,6 +759,13 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                 </p>
               </div>
             )}
+            
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-md mb-4">
+              <p className="text-sm text-blue-800">
+                Como gerente do time, seu feedback é importante para ajudar os membros a entenderem suas emoções e melhorar o ambiente de trabalho.
+              </p>
+            </div>
+            
             <div className="space-y-2">
               <label htmlFor="feedback" className="text-sm font-medium">
                 Seu feedback:
@@ -665,6 +778,18 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                 onChange={(e) => setFeedbackText(e.target.value)}
               />
             </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="anonymous-feedback"
+                checked={isAnonymousFeedback}
+                onChange={(e) => setIsAnonymousFeedback(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="anonymous-feedback" className="text-sm text-gray-600">
+                Enviar feedback anonimamente
+              </label>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -674,16 +799,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
               Cancelar
             </Button>
             <Button
-              onClick={() => {
-                setSendingFeedback(true);
-                // Aqui você implementaria a lógica para enviar o feedback
-                // Por exemplo, uma chamada à API
-                setTimeout(() => {
-                  toast.success("Feedback enviado com sucesso!");
-                  setShowFeedbackModal(false);
-                  setSendingFeedback(false);
-                }, 1000);
-              }}
+              onClick={handleSendFeedback}
               disabled={!feedbackText.trim() || sendingFeedback}
             >
               {sendingFeedback ? (

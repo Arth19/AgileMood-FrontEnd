@@ -23,7 +23,18 @@ interface FeedbackMessageProps {
   memberName?: string;
   emotionId?: number;
   emotionName?: string;
+  emotionRecordId?: number;
   isAnonymous?: boolean;
+}
+
+// Interface para o payload do feedback
+interface FeedbackPayload {
+  message: string;
+  is_anonymous: boolean;
+  emotion_record_id?: number;
+  team_id?: number;
+  user_id?: number;
+  emotion_id?: number;
 }
 
 export function FeedbackMessage({ 
@@ -32,6 +43,7 @@ export function FeedbackMessage({
   memberName, 
   emotionId, 
   emotionName,
+  emotionRecordId,
   isAnonymous = false 
 }: FeedbackMessageProps) {
   const [message, setMessage] = useState("");
@@ -53,23 +65,36 @@ export function FeedbackMessage({
       }
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`${apiUrl}/feedback`, {
+      
+      // Preparar o payload de acordo com o endpoint /feedback/
+      const payload: FeedbackPayload = {
+        message,
+        is_anonymous: anonymous
+      };
+      
+      // Se temos um ID de registro de emoção específico, usamos ele
+      if (emotionRecordId) {
+        payload.emotion_record_id = emotionRecordId;
+      } 
+      // Caso contrário, enviamos os dados do membro e emoção (endpoint antigo)
+      else if (memberId || emotionId) {
+        payload.team_id = teamId;
+        if (memberId) payload.user_id = memberId;
+        if (emotionId) payload.emotion_id = emotionId;
+      }
+
+      const response = await fetch(`${apiUrl}/feedback/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          team_id: teamId,
-          user_id: memberId,
-          emotion_id: emotionId,
-          message,
-          is_anonymous: anonymous
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error(`Falha ao enviar feedback: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(`Falha ao enviar feedback: ${response.status} - ${errorData?.detail || response.statusText}`);
       }
 
       toast.success("Feedback enviado com sucesso!");
@@ -77,7 +102,7 @@ export function FeedbackMessage({
       setOpen(false);
     } catch (error) {
       console.error("Erro ao enviar feedback:", error);
-      toast.error("Ocorreu um erro ao enviar o feedback. Tente novamente.");
+      toast.error(error instanceof Error ? error.message : "Ocorreu um erro ao enviar o feedback. Tente novamente.");
     } finally {
       setSending(false);
     }
@@ -102,6 +127,9 @@ export function FeedbackMessage({
             )}
             {emotionName && (
               <> sobre a emoção <strong>{emotionName}</strong></>
+            )}
+            {emotionRecordId && (
+              <> (Registro #{emotionRecordId})</>
             )}
           </DialogDescription>
         </DialogHeader>

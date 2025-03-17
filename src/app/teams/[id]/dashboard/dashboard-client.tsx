@@ -25,6 +25,7 @@ interface TeamMember {
   team_id: number;
   role: string;
   avatar?: string;
+  latest_emotion_record_id?: number;
 }
 
 interface TeamEmotion {
@@ -76,6 +77,7 @@ interface UserEmotionRecord {
   emotion_name: string;
   frequency: number;
   avg_intensity: number;
+  emotion_id?: number;
 }
 
 interface EmojiDistributionResponse {
@@ -241,7 +243,8 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
         anonymousRecordsData.push({
           emotion_name: `${emotion.emoji} ${emotion.name}`,
           frequency: count,
-          avg_intensity: Number(avgIntensity.toFixed(1))
+          avg_intensity: Number(avgIntensity.toFixed(1)),
+          emotion_id: emotion.id
         });
       }
     });
@@ -356,7 +359,8 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
       return {
         emotion_name: `${emotion.emoji} ${emotion.name}`,
         frequency: data.count,
-        avg_intensity: Number(avgIntensity.toFixed(1))
+        avg_intensity: Number(avgIntensity.toFixed(1)),
+        emotion_id: emotion.id
       };
     }).filter(record => record.frequency > 0) // Remove emoções sem registros
       .sort((a, b) => b.frequency - a.frequency); // Ordena por frequência decrescente
@@ -880,6 +884,20 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                                     {report.notes}
                                   </div>
                                 )}
+                                {/* Botão de Feedback - apenas para gerentes */}
+                                {teamData?.user_role === 'manager' && (
+                                  <div className="mt-3 flex justify-end">
+                                    <FeedbackMessage 
+                                      teamId={teamId}
+                                      memberId={report.is_anonymous ? undefined : report.user_id || undefined}
+                                      memberName={report.is_anonymous ? 'Anônimo' : userName}
+                                      emotionId={report.emotion_id}
+                                      emotionName={`${emotion?.emoji || ''} ${emotion?.name || ''}`}
+                                      emotionRecordId={report.id}
+                                      isAnonymous={report.is_anonymous}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -1087,6 +1105,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                                         memberId={selectedMemberId}
                                         memberName={userEmotionAnalysis.user_name}
                                         emotionName={item.emotion_name}
+                                        emotionId={item.emotion_id}
                                       />
                                     )}
                                   </div>
