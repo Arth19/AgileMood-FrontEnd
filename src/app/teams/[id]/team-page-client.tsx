@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TeamResponse, TeamMember, TeamEmotion } from "@/lib/types/index";
+import { TeamResponse, TeamMember, TeamEmotion, EmotionReport } from "@/lib/types/index";
 import { notFound } from "next/navigation";
-import { Loader2, UserPlus, Settings, Check, BarChart2, Trash2 } from "lucide-react";
+import { Loader2, UserPlus, Settings, Check, BarChart2, Trash2, MessageSquare } from "lucide-react";
 import ProtectedRoute from "@/components/ui/protected-route";
 import Sidebar from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,10 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
   const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
   const [deletingMember, setDeletingMember] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [currentReport, setCurrentReport] = useState<EmotionReport | null>(null);
+  const [sendingFeedback, setSendingFeedback] = useState(false);
 
   const { allEmotions, fetchAllEmotions, updateTeamEmotions } = useEmotionRecordContext();
   const router = useRouter();
@@ -361,6 +365,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                           <th className="text-left p-3 border-b">Usuário</th>
                           <th className="text-left p-3 border-b">Observações</th>
                           <th className="text-left p-3 border-b">Data</th>
+                          <th className="text-left p-3 border-b">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -408,6 +413,21 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 ) : (
                                   <span className="text-gray-400">Data não disponível</span>
                                 )}
+                              </td>
+                              <td className="p-3 border-b">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="flex items-center gap-1 text-xs"
+                                  onClick={() => {
+                                    setCurrentReport(report);
+                                    setFeedbackText("");
+                                    setShowFeedbackModal(true);
+                                  }}
+                                >
+                                  <MessageSquare className="h-3 w-3" />
+                                  Enviar Feedback
+                                </Button>
                               </td>
                             </tr>
                           );
@@ -599,6 +619,80 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                 </>
               ) : (
                 'Remover Membro'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Feedback */}
+      <Dialog open={showFeedbackModal} onOpenChange={setShowFeedbackModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enviar Feedback</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {currentReport && (
+              <div className="bg-gray-50 p-3 rounded-md mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">
+                    {teamData?.emotions.find(e => e.id === currentReport.emotion_id)?.emoji}
+                  </span>
+                  <span className="font-medium">
+                    {teamData?.emotions.find(e => e.id === currentReport.emotion_id)?.name}
+                  </span>
+                  <span className={`ml-auto px-2 py-1 rounded-full text-xs ${getIntensityLabel(currentReport.intensity).color}`}>
+                    {getIntensityLabel(currentReport.intensity).label}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {currentReport.notes || "Sem observações"}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {currentReport.created_at ? new Date(currentReport.created_at).toLocaleString('pt-BR') : "Data não disponível"}
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label htmlFor="feedback" className="text-sm font-medium">
+                Seu feedback:
+              </label>
+              <textarea
+                id="feedback"
+                className="w-full min-h-[100px] p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Digite seu feedback para este registro de emoção..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowFeedbackModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                setSendingFeedback(true);
+                // Aqui você implementaria a lógica para enviar o feedback
+                // Por exemplo, uma chamada à API
+                setTimeout(() => {
+                  toast.success("Feedback enviado com sucesso!");
+                  setShowFeedbackModal(false);
+                  setSendingFeedback(false);
+                }, 1000);
+              }}
+              disabled={!feedbackText.trim() || sendingFeedback}
+            >
+              {sendingFeedback ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                "Enviar Feedback"
               )}
             </Button>
           </DialogFooter>
