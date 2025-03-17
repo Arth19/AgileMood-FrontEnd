@@ -14,7 +14,6 @@ import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { Sprint, SprintSelector } from "@/components/ui/sprint-selector";
 import { EmotionBarChart, EmotionPieChart, EmotionChartData } from "@/components/charts/emotion-charts";
 import { FeedbackMessage } from "@/components/feedback/feedback-message";
 
@@ -117,39 +116,8 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
   const [teamData, setTeamData] = useState<TeamResponse | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [filteredReports, setFilteredReports] = useState<EmotionReport[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null);
   
   const router = useRouter();
-
-  // Função para gerar sprints fictícias para demonstração
-  const generateDemoSprints = useCallback(() => {
-    const demoSprints: Sprint[] = [];
-    const today = new Date();
-    
-    // Gerar 6 sprints anteriores de 2 semanas cada
-    for (let i = 0; i < 6; i++) {
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() - (i * 14));
-      
-      const startDate = new Date(endDate);
-      startDate.setDate(endDate.getDate() - 13);
-      
-      demoSprints.push({
-        id: `sprint-${i+1}`,
-        name: `Sprint ${i+1}`,
-        startDate,
-        endDate
-      });
-    }
-    
-    setSprints(demoSprints);
-  }, []);
-
-  // Efeito para gerar sprints de demonstração
-  useEffect(() => {
-    generateDemoSprints();
-  }, [generateDemoSprints]);
 
   // Função para processar os dados do time e gerar estatísticas com base no período selecionado
   const processTeamData = useCallback((data: TeamResponse, range: DateRange | undefined = undefined) => {
@@ -399,20 +367,6 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     };
   }, [teamData]);
 
-  // Função para lidar com a mudança de sprint
-  const handleSprintChange = useCallback((sprint: Sprint | null) => {
-    setSelectedSprint(sprint);
-    
-    if (sprint) {
-      setDateRange({
-        from: sprint.startDate,
-        to: sprint.endDate
-      });
-    } else {
-      setDateRange(undefined);
-    }
-  }, []);
-
   // Buscar dados do time
   const fetchTeamData = useCallback(async () => {
     try {
@@ -524,9 +478,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     
     // Definir nome do arquivo com período, se aplicável
     let fileName = `relatorio-emocoes-time-${teamId}`;
-    if (selectedSprint) {
-      fileName += `-sprint-${selectedSprint.name.replace(/\s+/g, '-')}`;
-    } else if (dateRange?.from && dateRange?.to) {
+    if (dateRange?.from && dateRange?.to) {
       fileName += `-${format(dateRange.from, 'dd-MM-yyyy')}_a_${format(dateRange.to, 'dd-MM-yyyy')}`;
     }
     fileName += '.csv';
@@ -538,7 +490,7 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
     document.body.removeChild(link);
     
     toast.success("Relatório exportado com sucesso!");
-  }, [teamData, filteredReports, teamId, dateRange, selectedSprint]);
+  }, [teamData, filteredReports, teamId, dateRange]);
 
   // Função para converter dados de emoções para o formato dos gráficos
   const convertToChartData = useCallback((data: EmojiDistribution[] | AverageIntensity[]): EmotionChartData[] => {
@@ -608,37 +560,27 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
               <CardHeader>
                 <CardTitle>Filtrar por Período</CardTitle>
                 <CardDescription>
-                  Selecione um período ou sprint para filtrar os relatórios de emoções
+                  Selecione um período para filtrar os relatórios de emoções
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="mb-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Selecionar Sprint</label>
-                    <SprintSelector 
-                      sprints={sprints}
-                      selectedSprint={selectedSprint}
-                      onSprintChange={handleSprintChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Ou Selecionar Período Personalizado</label>
+                    <label className="text-sm font-medium">Selecionar Período</label>
                     <DateRangePicker 
                       dateRange={dateRange} 
                       onDateRangeChange={(range) => {
                         setDateRange(range);
-                        if (range) setSelectedSprint(null);
                       }}
                     />
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
-                    {(dateRange?.from || selectedSprint) && (
+                    {dateRange?.from && (
                       <div className="p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
                         {filteredReports.length} registros encontrados no período selecionado
-                        {selectedSprint && ` (Sprint ${selectedSprint.name})`}
-                        {!selectedSprint && dateRange?.from && dateRange?.to && 
+                        {dateRange?.from && dateRange?.to && 
                           ` (${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} a ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })})`
                         }
                       </div>
@@ -649,7 +591,6 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
                       variant="outline" 
                       onClick={() => {
                         setDateRange(undefined);
-                        setSelectedSprint(null);
                       }}
                     >
                       Limpar Filtros

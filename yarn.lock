@@ -21,13 +21,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@date-fns/tz@npm:^1.2.0":
-  version: 1.2.0
-  resolution: "@date-fns/tz@npm:1.2.0"
-  checksum: 2eb37e63fdbd5d72458c528ded6c2f7bdb76bae9c6875d3b827e33600b807cfbd72ab05c9291f258a6e6b7b360ec03e57f7e7d85fe6e0d5e989476dec908910e
-  languageName: node
-  linkType: hard
-
 "@emnapi/runtime@npm:^1.2.0":
   version: 1.3.1
   resolution: "@emnapi/runtime@npm:1.3.1"
@@ -1655,7 +1648,7 @@ __metadata:
     class-variance-authority: ^0.7.1
     clsx: ^2.1.1
     cmdk: ^1.0.4
-    date-fns: ^4.1.0
+    date-fns: ^3.3.1
     eslint: ^9
     eslint-config-next: 15.1.7
     framer-motion: ^12.4.7
@@ -1666,7 +1659,7 @@ __metadata:
     next-themes: ^0.4.4
     postcss: ^8
     react: ^19.0.0
-    react-day-picker: ^9.6.2
+    react-day-picker: ^8.10.1
     react-dom: ^19.0.0
     recharts: ^2.15.1
     sonner: ^2.0.1
@@ -2315,17 +2308,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"date-fns-jalali@npm:^4.1.0-0":
-  version: 4.1.0-0
-  resolution: "date-fns-jalali@npm:4.1.0-0"
-  checksum: cde80e4a87bfd96458ff1edfd5af5fed7ed6e04dd48574ed64d376e37e7689ddee1a7c5a6685f4b93cf3432eac73c51acd786504070a6973a140c5f15163ca39
-  languageName: node
-  linkType: hard
-
-"date-fns@npm:^4.1.0":
-  version: 4.1.0
-  resolution: "date-fns@npm:4.1.0"
-  checksum: fb681b242cccabed45494468f64282a7d375ea970e0adbcc5dcc92dcb7aba49b2081c2c9739d41bf71ce89ed68dd73bebfe06ca35129490704775d091895710b
+"date-fns@npm:^3.3.1":
+  version: 3.3.1
+  resolution: "date-fns@npm:3.3.1"
+  checksum: 6245e93a47de28ac96dffd4d62877f86e6b64854860ae1e00a4f83174d80bc8e59bd1259cf265223fb2ddce5c8e586dc9cc210f0d052faba2f7660e265877283
   languageName: node
   linkType: hard
 
@@ -4604,16 +4590,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-day-picker@npm:^9.6.2":
-  version: 9.6.2
-  resolution: "react-day-picker@npm:9.6.2"
-  dependencies:
-    "@date-fns/tz": ^1.2.0
-    date-fns: ^4.1.0
-    date-fns-jalali: ^4.1.0-0
+"react-day-picker@npm:^8.10.1":
+  version: 8.10.1
+  resolution: "react-day-picker@npm:8.10.1"
   peerDependencies:
-    react: ">=16.8.0"
-  checksum: 9ba4fbef2b98e021dff01d93bd4c2077f8584a3e2e21fa8465589ddc320ec91cf1300e1d586d820b6d2c3d2325fc2b02bcc781350a6407622feafcc30a24bcc3
+    date-fns: ^2.28.0 || ^3.0.0
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0
+  checksum: daf7fb5aad1e355df9149e954fafc2cd40ceb90de799db4f36ef86d24729aaecfdf022fa9e63f24d093d81dc2beb60f65ae796741dff0f7305a2af80b333fb4c
   languageName: node
   linkType: hard
 
