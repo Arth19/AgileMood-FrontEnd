@@ -476,7 +476,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                           // Encontrar a emoção correspondente
                           const emotion = teamData.emotions.find(e => e.id === report.emotion_id);
                           // Encontrar o usuário correspondente (se não for anônimo)
-  
+                          console.log(report)
                           
                           return (
                             <tr key={report.id} className="hover:bg-gray-50">
@@ -498,13 +498,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 </span>
                               </td>
                               <td className="p-3 border-b">
-                                {report.is_anonymous ? (
+                                {report.user_name === null ? (
                                   <span className="text-gray-500">Anônimo</span>
-                                ) : report.user_name ? (
-                                  <span>{report.user_name.charAt(0).toUpperCase() + report.user_name.slice(1)}</span>
                                 ) : (
-                                  <span className="text-gray-500">Usuário não encontrado</span>
+                                  <span>{report.user_name!.charAt(0).toUpperCase() + report.user_name?.slice(1)}</span>
                                 )}
+
                               </td>
                               <td className="p-3 border-b">
                                 {report.notes || <span className="text-gray-400">Sem observações</span>}
@@ -517,7 +516,6 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                                 )}
                               </td>
                               <td className="p-3 border-b">
-                                 
                                   <Button 
                                     variant="outline" 
                                     size="sm"
@@ -777,18 +775,6 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
               />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="anonymous-feedback"
-                checked={isAnonymousFeedback}
-                onChange={(e) => setIsAnonymousFeedback(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="anonymous-feedback" className="text-sm text-gray-600">
-                Enviar feedback anonimamente
-              </label>
             </div>
           </div>
           <DialogFooter>

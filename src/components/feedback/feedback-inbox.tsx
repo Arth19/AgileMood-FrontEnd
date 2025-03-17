@@ -201,51 +201,7 @@ export function FeedbackInbox() {
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-1 border-blue-200 bg-white">
-                  <Filter className="h-4 w-4 text-blue-600" />
-                  <span>Filtrar</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => setFilterType('all')} className={filterType === 'all' ? 'bg-blue-50' : ''}>
-                  Todos os feedbacks
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType('anonymous')} className={filterType === 'anonymous' ? 'bg-blue-50' : ''}>
-                  Apenas anônimos
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType('identified')} className={filterType === 'identified' ? 'bg-blue-50' : ''}>
-                  Apenas identificados
-                </DropdownMenuItem>
-                <DropdownMenuItem className="border-t mt-1 pt-1" onClick={resetFilters}>
-                  Limpar filtros
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-1 border-blue-200 bg-white">
-                  <span>Emoção</span>
-                  <ChevronDown className="h-4 w-4 text-blue-600" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => setSelectedEmotionRecord(null)} className={selectedEmotionRecord === null ? 'bg-blue-50' : ''}>
-                  Todas as emoções
-                </DropdownMenuItem>
-                {getEmotionRecordOptions().map(option => (
-                  <DropdownMenuItem 
-                    key={option.id} 
-                    onClick={() => setSelectedEmotionRecord(option.id)}
-                    className={selectedEmotionRecord === option.id ? 'bg-blue-50' : ''}
-                  >
-                    {option.emoji} {option.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
             
             <Button 
               variant="outline" 

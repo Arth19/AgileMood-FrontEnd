@@ -613,11 +613,10 @@ export default function DashboardClient({ teamId }: DashboardClientProps) {
             </Card>
 
             <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
                 <TabsTrigger value="emotions">Distribuição de Emoções</TabsTrigger>
                 <TabsTrigger value="intensity">Intensidade Média</TabsTrigger>
-                <TabsTrigger value="members">Análise por Membro</TabsTrigger>
               </TabsList>
 
               {/* Aba de Visão Geral */}
