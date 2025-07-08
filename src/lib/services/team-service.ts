@@ -1,4 +1,11 @@
-import { CreateTeamDTO, Team, TeamsResponse, UpdateTeamDTO, TeamResponse } from "../types";
+// ⚠️ Importa do arquivo de tipagens completo (src/lib/types/index.ts) para ter TeamResponse
+import {
+  CreateTeamDTO,
+  Team,
+  TeamsResponse,
+  UpdateTeamDTO,
+  TeamResponse,
+} from "../types/index";
 import { API_ROUTES } from "../config";
 
 class TeamService {
