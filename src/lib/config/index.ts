@@ -4,5 +4,6 @@ export const API_ROUTES = {
   teams: `${API_BASE_URL}/teams`,
   users: `${API_BASE_URL}/users`,
   emotions: `${API_BASE_URL}/emotions`,
+  emotion: `${API_BASE_URL}/emotion`,
   emotionRecords: `${API_BASE_URL}/emotion_record`,
 }; 
