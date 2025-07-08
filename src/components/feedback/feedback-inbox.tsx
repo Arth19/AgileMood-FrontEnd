@@ -3,18 +3,18 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageSquare, RefreshCw, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, ChevronDown, ChevronUp } from "lucide-react"; //removed Filter
 import { useAuthContext } from "@/contexts/auth-context";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu";
 
 interface Feedback {
   id: number;

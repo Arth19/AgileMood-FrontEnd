@@ -298,7 +298,7 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
         
         throw new Error(
           Array.isArray(errorData.detail) 
-            ? errorData.detail.map((err: any) => `${err.loc.join('.')}: ${err.msg}`).join(', ') 
+            ? errorData.detail.map((err: { loc: string[]; msg: string }) => `${err.loc.join('.')}: ${err.msg}`).join(', ') 
             : errorData.detail || 'Falha ao enviar feedback'
         );
       }
@@ -802,4 +802,4 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
       </Dialog>
     </ProtectedRoute>
   );
-} 
+}
