@@ -12,9 +12,16 @@ export const DELAYS = {
   TRANSITION: 200,
 } as const;
 
+const fallbackUrl =
+  process.env.NODE_ENV === 'production'
+    ? 'https://agilemood-backend-production.up.railway.app'
+    : 'http://localhost:8000';
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
+
 // API
 export const API = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
+  BASE_URL: API_BASE_URL,
   TIMEOUT: 10000,
 } as const;
 

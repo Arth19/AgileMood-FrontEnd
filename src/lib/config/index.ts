@@ -11,4 +11,4 @@ export const API_ROUTES = {
   emotions: `${API_BASE_URL}/emotions/`,
   emotion: `${API_BASE_URL}/emotion/`,
   emotionRecords: `${API_BASE_URL}/emotion_record/`,
-}; 
+} as const; 
