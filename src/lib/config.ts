@@ -11,4 +11,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
 
 export const API_ROUTES = {
   teams: `${API_BASE_URL}/teams/`,
+  emotions: `${API_BASE_URL}/emotions/`,
+  emotion: `${API_BASE_URL}/emotion/`,
+  users: `${API_BASE_URL}/users/`,
 } as const;
