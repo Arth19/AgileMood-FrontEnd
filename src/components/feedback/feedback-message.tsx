@@ -59,7 +59,12 @@ export function FeedbackMessage({
 
     setSending(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       if (!apiUrl) {
         throw new Error('URL da API não configurada');
       }

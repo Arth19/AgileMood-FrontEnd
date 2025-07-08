@@ -78,7 +78,12 @@ export default function EmployeeHome() {
 
       try {
         setLoadingTeam(true);
-        const API_URL = process.env.NEXT_PUBLIC_API_URL;
+        const fallbackUrl =
+          process.env.NODE_ENV === 'production'
+            ? 'https://agilemood-backend-production.up.railway.app'
+            : 'http://localhost:8000';
+
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
         const token = localStorage.getItem('token');
         
         const response = await fetch(`${API_URL}/teams/${user.team_id}`, {

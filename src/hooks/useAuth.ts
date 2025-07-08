@@ -9,8 +9,12 @@ export default function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const fallbackUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://agilemood-backend-production.up.railway.app'
+      : 'http://localhost:8000';
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setLoading(true);

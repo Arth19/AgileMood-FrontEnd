@@ -63,7 +63,12 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
   const [loading, setLoading] = useState(true);
 
   const { user } = useAuthContext();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const fallbackUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://agilemood-backend-production.up.railway.app'
+      : 'http://localhost:8000';
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
 
   // Variável para controlar o tempo da última chamada
   const lastFetchTimeRef = useRef({

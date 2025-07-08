@@ -32,7 +32,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const fallbackUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://agilemood-backend-production.up.railway.app'
+      : 'http://localhost:8000';
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
 
   const fetchUserProfile = async () => {
     const token = localStorage.getItem("token");

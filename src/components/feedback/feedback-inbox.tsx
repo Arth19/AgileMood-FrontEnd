@@ -53,7 +53,12 @@ export function FeedbackInbox() {
     setError(null);
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       if (!apiUrl) {
         throw new Error('URL da API não configurada');
       }
@@ -77,7 +82,10 @@ export function FeedbackInbox() {
       }
 
       const data = await response.json();
-      setFeedbacks(data.feedbacks || []);
+      // setFeedbacks(data.feedbacks || []);
+      // garanta o tipo correto logo aqui
+      const feedbackList: Feedback[] = data.feedbacks ?? [];
+      setFeedbacks(feedbackList);
       
       // Buscar detalhes dos registros de emoção para cada feedback
       const uniqueEmotionRecordIds = [...new Set(data.feedbacks.map((f: Feedback) => f.emotion_record_id))];

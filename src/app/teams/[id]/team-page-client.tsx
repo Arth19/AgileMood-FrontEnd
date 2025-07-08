@@ -41,7 +41,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
 
   const fetchTeamData = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       if (!apiUrl) {
         throw new Error('URL da API não configurada');
       }
@@ -98,7 +103,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
   const handleAddMember = async () => {
     try {
       setAddingMember(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       const token = localStorage.getItem('token');
       const email = newMemberEmail;
       
@@ -176,7 +186,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
     
     try {
       setDeletingMember(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       const token = localStorage.getItem('token');
       
       // Log para depuração
@@ -232,7 +247,12 @@ export default function TeamPageClient({ teamId }: TeamPageClientProps) {
     
     try {
       setSendingFeedback(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const fallbackUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://agilemood-backend-production.up.railway.app'
+        : 'http://localhost:8000';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
       if (!apiUrl) {
         throw new Error('URL da API não configurada');
       }
