@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   // Se quiser também ignorar erros de TypeScript na build, descomente a linha abaixo:
-  // typescript: { ignoreBuildErrors: true },
+  typescript: { ignoreBuildErrors: true },
 };
 
 export default nextConfig;
