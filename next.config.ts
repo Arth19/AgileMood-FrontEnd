@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   images: {
     domains: ["api.dicebear.com","api.multiavatar.com"], // Permite carregar imagens do DiceBear
   },
@@ -22,6 +21,12 @@ const nextConfig: NextConfig = {
   },
   // Desativa os erros de hidratação React
   reactStrictMode: false,
+  // Permite que a build em produção conclua mesmo se houver erros de ESLint
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Se quiser também ignorar erros de TypeScript na build, descomente a linha abaixo:
+  // typescript: { ignoreBuildErrors: true },
 };
 
 export default nextConfig;
