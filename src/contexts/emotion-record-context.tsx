@@ -82,7 +82,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
     console.log("🌍 Fetching emotions from API...");
   
     try {
-      const response = await fetch(`${API_URL}/emotion`, {
+      const response = await fetch(`${API_URL}/emotions`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -414,7 +414,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
 
         console.log("Criando emoção:", emotionWithTeamId);
 
-        const response = await fetch(`${API_URL}/emotion/`, {
+        const response = await fetch(`${API_URL}/emotions/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -536,7 +536,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
           console.log(`Enviando POST para emoção ${emotionId}:`, payload);
           
           // Fazer o POST para esta emoção
-          const response = await fetch(`${API_URL}/emotion`, {
+          const response = await fetch(`${API_URL}/emotions`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
