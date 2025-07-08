@@ -1,5 +1,14 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Define uma URL padrão diferente para produção e desenvolvimento.
+// • Em produção (Vercel), se a variável de ambiente `NEXT_PUBLIC_API_URL` não estiver
+//   configurada, usaremos HTTPS para evitar Mixed‑Content.
+// • Em desenvolvimento local, continuamos usando http://localhost:8000.
+const fallbackUrl =
+  process.env.NODE_ENV === 'production'
+    ? 'https://agilemood-backend-production.up.railway.app'
+    : 'http://localhost:8000';
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || fallbackUrl;
 
 export const API_ROUTES = {
-  teams: `${API_BASE_URL}/teams`
-} as const; 
+  teams: `${API_BASE_URL}/teams`,
+} as const;
