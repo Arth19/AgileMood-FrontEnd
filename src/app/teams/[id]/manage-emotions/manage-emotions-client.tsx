@@ -65,7 +65,7 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
     console.log(`Toggle emoção ID: ${emotionId}, Tipo: ${typeof emotionId}`);
     
     // Verificar se o ID é válido
-    if (typeof emotionId !== 'number' || isNaN(emotionId) || emotionId <= 0) {
+    if (typeof emotionId !== 'number' || isNaN(emotionId)) {
       console.error(`ID de emoção inválido: ${emotionId}`);
       toast.error("Erro ao selecionar emoção: ID inválido");
       return;
@@ -122,6 +122,19 @@ export default function ManageEmotionsClient({ teamId }: ManageEmotionsClientPro
     
     if (selectedEmotionsDetails.length !== 6) {
       toast.error("Algumas emoções selecionadas não foram encontradas. Tente novamente.");
+      return;
+    }
+
+    // Verificar se as emoções selecionadas são as mesmas já atribuídas ao time
+    const currentTeamEmotionIds = teamEmotions.map((e) => e.id).sort();
+    const newEmotionIds = [...selectedEmotions].sort();
+    const unchanged =
+      currentTeamEmotionIds.length === newEmotionIds.length &&
+      currentTeamEmotionIds.every((id, index) => id === newEmotionIds[index]);
+
+    if (unchanged) {
+      toast.success("As emoções do time já estão atualizadas.");
+      router.push(`/teams/${teamId}`);
       return;
     }
 

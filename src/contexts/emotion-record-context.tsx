@@ -330,18 +330,28 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       
+      const defaultEmotions = getAllEmotionsWithIds();
+
       if (response.ok) {
         const data = await response.json();
         if (data.emotions && data.emotions.length > 0) {
-          setAllEmotions(data.emotions);
+          // Combine API emotions with the fallback ones
+          const map = new Map<string, Emotion>();
+          data.emotions.forEach((e: Emotion) => map.set(e.name, e));
+          defaultEmotions.forEach((emotion) => {
+            if (!map.has(emotion.name)) {
+              map.set(emotion.name, emotion);
+            }
+          });
+          setAllEmotions(Array.from(map.values()));       
         } else {
           // Usar o mock de emoções quando não há dados da API
-          setAllEmotions(mockEmotions);
+          setAllEmotions(defaultEmotions);
           toast.info("⚡ Exibindo emoções de exemplo.");
         }
       } else {
         // Usar o mock de emoções em caso de erro
-        setAllEmotions(mockEmotions);
+        setAllEmotions(getAllEmotionsWithIds());
         toast.info("⚡ Exibindo emoções de exemplo.");
       }
     } catch (error) {
@@ -509,14 +519,49 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       // Exibir toast de carregamento
       toast.loading("Atualizando emoções do time...", { id: "emotions-loading" });
 
-      const results = [];
-      const errors = [];
-      
-      // Para cada emoção selecionada, fazer um POST individual
-      for (const emotionId of selectedEmotionIds) {
+      const results: Emotion[] = [];
+      const errors: string[] = [];
+
+      const currentIds = teamEmotions.map((e) => e.id);
+      const idsToDelete = teamEmotions
+        .filter((e) => !selectedEmotionIds.includes(e.id))
+        .map((e) => e.id);
+      const idsToCreate = selectedEmotionIds.filter(
+        (id) => !currentIds.includes(id)
+      );
+
+      // Deletar emoções que não foram selecionadas
+      for (const id of idsToDelete) {
+        try {
+          const response = await fetch(`${API_URL}/emotions/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({
+              message: "Erro ao processar resposta",
+            }));
+            const errorMessage = `Erro ao remover emoção ${id}: ${
+              errorData.message || "Erro desconhecido"
+            }`;
+            console.error(errorMessage);
+            errors.push(errorMessage);
+          }
+        } catch (error) {
+          const errorMessage = `Erro de conexão ao remover emoção ${id}`;
+          console.error(errorMessage, error);
+          errors.push(errorMessage);
+        }
+      }
+
+      // Criar emoções novas
+      for (const emotionId of idsToCreate) {
         try {
           // Obter os detalhes da emoção
-          const emotionDetails = allEmotions.find(e => e.id === emotionId);
+          const emotionDetails = allEmotions.find((e) => e.id === emotionId);
           
           if (!emotionDetails) {
             console.error(`Emoção com ID ${emotionId} não encontrada`);
@@ -530,7 +575,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
             emoji: emotionDetails.emoji,
             color: emotionDetails.color,
             team_id: teamId,
-            is_negative: emotionDetails.is_negative
+            is_negative: emotionDetails.is_negative,
           };
           
           console.log(`Enviando POST para emoção ${emotionId}:`, payload);
@@ -546,17 +591,21 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
           });
           
           if (response.ok) {
-            const data = await response.json();
-            console.log(`Emoção ${emotionId} atualizada com sucesso:`, data);
+            const data: Emotion = await response.json();
+            console.log(`Emoção ${emotionId} criada com sucesso:`, data);
             results.push(data);
           } else {
-            const errorData = await response.json().catch(() => ({ message: "Erro ao processar resposta" }));
-            const errorMessage = `Erro ao atualizar emoção ${emotionId}: ${errorData.message || "Erro desconhecido"}`;
+            const errorData = await response.json().catch(() => ({
+              message: "Erro ao processar resposta",
+            }));
+            const errorMessage = `Erro ao criar emoção ${emotionId}: ${
+              errorData.message || "Erro desconhecido"
+            }`;
             console.error(errorMessage);
             errors.push(errorMessage);
           }
         } catch (error) {
-          const errorMessage = `Erro de conexão ao atualizar emoção ${emotionId}`;
+          const errorMessage = `Erro de conexão ao criar emoção ${emotionId}`;
           console.error(errorMessage, error);
           errors.push(errorMessage);
         }
@@ -587,7 +636,7 @@ export const EmotionRecordProvider = ({ children }: { children: ReactNode }) => 
       toast.dismiss("emotions-loading");
       return false;
     }
-  }, [user, API_URL, fetchTeamEmotions, allEmotions]);
+  }, [user, API_URL, fetchTeamEmotions, allEmotions, teamEmotions]);
 
   const registerEmotion = useCallback(async (
     emotionId: number,

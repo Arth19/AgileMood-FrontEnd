@@ -49,7 +49,7 @@ export const getBalancedEmotions = () => {
 export const getAllEmotionsWithIds = () => {
   return mockEmotions.map((emotion, index) => ({
     ...emotion,
-    id: index + 1,
-    team_id: 1
+    id: -(index + 1),
+    team_id: 1,
   }));
-}; 
+};
