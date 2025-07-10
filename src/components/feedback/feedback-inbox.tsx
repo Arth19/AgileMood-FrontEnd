@@ -104,7 +104,7 @@ export function FeedbackInbox() {
     
     for (const recordId of recordIds) {
       try {
-        const response = await fetch(`${apiUrl}/emotions/record/${recordId}`, {
+        const response = await fetch(`${apiUrl}/emotion_record/id/${recordId}`, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -147,15 +147,6 @@ export function FeedbackInbox() {
   const resetFilters = () => {
     setSelectedEmotionRecord(null);
     setFilterType('all');
-  };
-  
-  const getEmotionRecordOptions = () => {
-    const uniqueRecords = [...new Set(feedbacks.map(f => f.emotion_record_id))];
-    return uniqueRecords.map(id => ({
-      id,
-      name: emotionRecords[id]?.emotion_name || `Registro #${id}`,
-      emoji: emotionRecords[id]?.emotion_emoji || '🔍'
-    }));
   };
 
   if (loading) {
