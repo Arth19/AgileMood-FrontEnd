@@ -50,6 +50,7 @@ export interface TeamResponse {
   members: TeamMember[];
   emotions_reports: EmotionReport[];
   emotions: TeamEmotion[];
+  manager: TeamMember;  // Adiciona o manager real do time
   user_role?: "employee" | "manager";
 }
 

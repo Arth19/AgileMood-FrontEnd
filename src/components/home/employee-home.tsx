@@ -100,15 +100,15 @@ export default function EmployeeHome() {
 
         const data = await response.json();
         
-        // Encontrar o gerente na lista de membros
-        const manager = data.members.find((member: TeamMember) => member.role === 'manager');
+        // Usar o manager real retornado pela API, não procurar na lista de membros
+        const actualManager = data.manager;
         
         setTeamData({
           name: data.team_data.name,
-          manager: manager ? {
-            name: manager.name,
-            email: manager.email,
-            avatar: manager.avatar
+          manager: actualManager ? {
+            name: actualManager.name,
+            email: actualManager.email,
+            avatar: actualManager.avatar
           } : undefined,
           members: data.members.length,
           emotions_reports: data.emotions_reports,
